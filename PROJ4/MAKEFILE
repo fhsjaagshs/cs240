@@ -1,0 +1,23 @@
+hexdump.exe: hexdump.asm
+   ml /Fl hexdump.asm irvine16.lib
+
+clean:
+   del *.exe
+   del *.lst
+   del *.obj
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,12 @@
+all: ccalc.exe data.exe
+
+ccalc.exe: ccalc.asm
+   ml /Fl ccalc.asm irvine16.lib
+
+data.exe: data.asm
+   ml /Fl data.asm irvine16.lib
+
+clean:
+   del *.exe
+   del *.lst
+   del *.obj

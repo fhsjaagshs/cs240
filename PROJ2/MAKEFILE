@@ -1,0 +1,18 @@
+all: fib.exe hello.exe poly.exe hex.exe
+
+fib.exe: fib.asm
+   ml /Fl fib.asm irvine16.lib
+
+hello.exe: hello.asm
+   ml /Fl hello.asm irvine16.lib
+
+poly.exe: poly.asm
+   ml /Fl poly.asm irvine16.lib
+
+hex.exe: hex.asm
+   ml /Fl hex.asm irvine16.lib
+
+clean:
+   del *.exe
+   del *.lst
+   del *.obj

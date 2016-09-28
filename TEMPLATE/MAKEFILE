@@ -1,0 +1,23 @@
+template.exe: template.asm
+   ml /Fl template.asm irvine16.lib
+
+clean:
+   del *.exe
+   del *.lst
+   del *.obj
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

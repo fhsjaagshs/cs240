@@ -1,0 +1,18 @@
+all: write.exe arysum.exe hexout.exe decimal.exe
+
+write.exe: write.asm
+   ml /Fl write.asm irvine16.lib
+
+arysum.exe: arysum.asm
+   ml /Fl arysum.asm irvine16.lib
+
+hexout.exe: hexout.asm
+   ml /Fl hexout.asm irvine16.lib
+
+decimal.exe: decimal.asm
+   ml /Fl decimal.asm irvine16.lib
+
+clean:
+   del *.exe
+   del *.lst
+   del *.obj
