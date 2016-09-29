@@ -19,6 +19,8 @@ PrintHumanReadable PROC
   ; IN: cx -> number of chars
   ;     ds:dx -> buffer
   ; OUT: prints human readable characters.
+  
+
   ret
 PrintHumanReadable ENDP
 
@@ -43,7 +45,7 @@ space ENDP
 
 newline PROC
   push dx
-  mov dl, 0Ah	; Print a '\n'
+  mov dl, 02h	; Print a '\n'
   call PutChar
   pop dx
   ret
@@ -56,6 +58,14 @@ pipe PROC
   pop dx
   ret
 pipe ENDP
+
+redDot PROC
+  push dx
+  mov dl, '.'
+  call PutChar
+  pop dx
+  ret
+redDot ENDP
 
 ;;
 ;; HEXADECIMAL PRINTING
@@ -130,7 +140,7 @@ HexOutSplit PROC
   push dx
 
   mov bx, cx		; Store CX in BX.
-  shr bx		; Divide BX by 2.
+  shr bx, 1		; Divide BX by 2.
   cmp bx, ax		; Is BX < AX?
 
   jl print_remainder	; goto print_remainder if true.

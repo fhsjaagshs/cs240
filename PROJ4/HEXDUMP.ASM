@@ -6,24 +6,26 @@ TITLE	hexdump.asm
 ; Works just like hexdump -C on Linux.
 
 INCLUDE Irvine16.inc
-INCLUDE argv.inc
-INCLUDE files.inc
-INCLUDE printing.inc
 
 .8086
 .stack 4096
 
 .data
-args BYTE 128 DUP(0)
+argv BYTE 128 DUP(0)
 argtable BYTE 64 DUP(0) ; Max # args = 64 single character args.
-argc BYTE 0
+argc WORD 0
 
 .code
+
+INCLUDE argv.inc
+INCLUDE files.inc
+INCLUDE printing.inc
+
 main PROC
   mov ax, @data	; setup data segment
   mov ds, ax	; make up for machine quirk
 
-  mov si, OFFSET args		; Load args addr into SI.
+  mov si, OFFSET argv		; Load args addr into SI.
   mov bx, OFFSET argtable	; Load argtable addr into BX.
   call args			; Read command line args.
   mov argc, cx			; Store the number of args in memory.
@@ -41,10 +43,12 @@ main PROC
   call hexdump			; print file as hex
   call FClose			; Close the file
 
-  jmp exit
+  jmp done
 invalid_args:
+  mov dl, '!'
+  call PutChar
   ;; TODO: print error message
-exit:
+done:
   mov ax, 4C00h	; Exit zero
   int 21h	; DOS interrupt with 4C00h
 main ENDP
@@ -98,20 +102,23 @@ AddOffset PROC
 
   push ax
   push bx
+  push cx
 
   mov bx, dx		; Move DX to BX so we can access memory.
   mov ax, [bx+2]	; Load low bytes of 32bit num into AX
-  adc ax, cl
+  xor ch, ch		; Clear high bytes of CX
+  adc ax, cx		; Add CX to AX w/ carry
   mov [bx+2], ax	; Load low bytes back into memory. Flags unmodified.
   jnc after		; If we carry over into the high bytes,
   mov ax, [bx]		; load the high bytes
   inc ax		; Add the carry
   mov [bx], ax		; load back into memory
 after:
+  pop cx
   pop bx
   pop ax
   ret
-AddOffset PROC
+AddOffset ENDP
 
 ; PRINTING ALGO (some is Haskell pseudocode)
 ; 1. Print offset
@@ -123,7 +130,7 @@ AddOffset PROC
 ;    2. print a space
 ;    3. print up to* 8 bytes
 ;     * print up to n bytes, if n bytes aren't available, print spaces.
-	Print a space after each byte.
+;	Print a space after each byte.
 ; 6. Print a pipe
 ; 7. Print bytes as ASCII, replacing unreadables with '.'
 ; 8. Print another pipe

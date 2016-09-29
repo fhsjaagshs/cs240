@@ -15,7 +15,7 @@
 FOpen PROC
   ; IN: DS:DX -> ASCIIZ file name
   ; OUT: AX, BX (see conventions)
-  mov ax 3D00h	; DOS interrupt code to open a file
+  mov ax, 3D00h	; DOS interrupt code to open a file
   int 21h	; DOS interrupt
   jc error
   mov bx, ax	; follow conventions, file handle in BX
