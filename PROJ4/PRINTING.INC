@@ -19,8 +19,29 @@ PrintHumanReadable PROC
   ; IN: cx -> number of chars
   ;     ds:dx -> buffer
   ; OUT: prints human readable characters.
-  
+  push cx
+  push dx
+  push si
 
+  mov si, dx
+
+top:
+  mov dl, [si]
+  inc si
+  cmp dl, '!'	; First printable char
+  jb unprintable
+  cmp dl, '~'	; Last printable char
+  ja unprintable
+  call PutChar
+  loop top
+  jmp done
+unprintable:
+  call redDot
+  loop top
+done:
+  pop si
+  pop dx
+  pop cx
   ret
 PrintHumanReadable ENDP
 
@@ -45,7 +66,9 @@ space ENDP
 
 newline PROC
   push dx
-  mov dl, 02h	; Print a '\n'
+  mov dl, 0Dh	; Print a '\r'
+  call PutChar
+  mov dl, 0Ah	; Print a '\n'
   call PutChar
   pop dx
   ret
@@ -128,7 +151,6 @@ HexOutByte PROC
   ret
 HexOutByte ENDP
 
-
 HexOutSplit PROC
   ; IN: ax -> number of bytes to print before splitting
   ;     cx -> number of bytes to print
@@ -139,10 +161,10 @@ HexOutSplit PROC
   push cx
   push dx
 
-  mov bx, cx		; Store CX in BX.
-  shr bx, 1		; Divide BX by 2.
-  cmp bx, ax		; Is BX < AX?
-
+  push cx
+  shr cx, 1		; Divide CX by 2.
+  cmp cx, ax		; Is CX < AX?
+  pop cx		; (doesn't modify flags)
   jl print_remainder	; goto print_remainder if true.
   sub cx, ax		; Subtract AX from CX.
 			; This allows execution to fall into
@@ -153,11 +175,25 @@ HexOutSplit PROC
   call HexOut		; Print AX bytes
   pop cx
 
+  call space
+
   add dx, ax		; Advance buffer beyond split
 
 print_remainder:
   call HexOut		; Print CX bytes
 
+  cmp ax, cx		; If we didn't print AX bytes again
+  je done
+
+  push ax
+  sub ax, cx		; Calculate how many
+  mov cx, ax		; spaces we need to pad the end into CX
+lp:
+  call space
+  loop lp
+  pop ax
+
+done:
   pop dx
   pop cx
   pop bx
@@ -177,6 +213,7 @@ HexOut PROC
 top:
   mov dl, [bx]
   call HexOutByte
+  call space
 
   inc bx
   loop top
