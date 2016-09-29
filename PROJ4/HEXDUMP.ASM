@@ -60,10 +60,13 @@ foffset DWORD 0		; Offset in file
 buffer BYTE 16 DUP(0)	; Current hexdump line
 .code
 
-top:
-  ;; TODO: print offset
-  mov dx, OFFSET foffset
-  call PrintUnsigned32
+  push ax
+  push bx
+  push cx
+  push dx
+
+;  mov dx, OFFSET foffset	; Load offset into DX
+;  call PrintUnsigned32		; Print it
 
   mov cx, 16			; Attempt to read 16 bytes
   mov dx, OFFSET buffer		; into file buffer
@@ -78,20 +81,29 @@ top:
   call space
   call space
 
+  push ax
+  push bx
   mov dx, OFFSET buffer		; Load file buffer offset into DX
   mov ax, 8			; Set the number of chars before a split.
+  mov bx, 16			; Set the line length
   call HexOutSplit		; Print the line (CX already set by FReadAdv)
+  pop bx
+  pop ax
 
-  call space
-  call space
+  call space			; We only print a single space b/c
+				; HexOutSplit prints a space afterwards
 
   call pipe
   call PrintHumanReadable
   call pipe
   call newline
 
-  jmp top
+  call hexdump
 done:
+  pop dx
+  pop cx
+  pop bx
+  pop ax
   ret
 hexdump ENDP
 
@@ -138,11 +150,4 @@ AddOffset ENDP
 ; 10. goto 1
 
 END main
-
-
-
-
-
-
-
 

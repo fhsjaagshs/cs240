@@ -15,6 +15,40 @@ PutChar PROC
   ret
 PutChar ENDP
 
+PutNChar PROC
+  ; IN: dl -> char to print
+  ;     cx -> number of times to print DL
+  ; OUT: prints DL CX times
+  cmp cx, 0
+  je done
+
+  push ax
+  push cx
+  mov ax, 0200h	; DOS interrupt for printing
+l:
+  int 21h	; Call DOS interrupt
+  loop l
+  pop cx
+  pop ax
+done:
+  ret
+PutNChar ENDP
+
+PutCharHuman PROC
+  ; IN: dl -> char to print human-friendly
+  ; OUT: prints it
+  cmp dl, '!'	; Is DL gte than 1st printable char?
+  jb unprintable
+  cmp dl, '~'	; Is DL lte than last printable char?
+  ja unprintable
+  call PutChar	; Print our character normally; Human-readable
+  jmp done
+unprintable:
+  call redDot	; Print a red period because it's not human readable.
+done:
+  ret
+PutCharHuman ENDP
+
 PrintHumanReadable PROC
   ; IN: cx -> number of chars
   ;     ds:dx -> buffer
@@ -23,22 +57,14 @@ PrintHumanReadable PROC
   push dx
   push si
 
-  mov si, dx
+  mov si, dx		; Use source index instead of DX
 
 top:
-  mov dl, [si]
-  inc si
-  cmp dl, '!'	; First printable char
-  jb unprintable
-  cmp dl, '~'	; Last printable char
-  ja unprintable
-  call PutChar
+  mov dl, [si]		; Read a byte from our buffer.
+  call PutCharHuman	; Print it human-readable.
+  inc si		; Advance buffer pointer.
   loop top
-  jmp done
-unprintable:
-  call redDot
-  loop top
-done:
+
   pop si
   pop dx
   pop cx
@@ -95,6 +121,7 @@ redDot ENDP
 ;;
 
 HexOutNybble PROC
+  ; **** COPIED FROM PREVIOUS WORK
   ; takes:
   ; dl -> Byte whose low nybble we will print
   ; causes -> prints the nybble
@@ -112,9 +139,8 @@ print:
   ret
 HexOutNybble ENDP
 
-;; TODO: copy HexOutByte
-
 HexOutByte PROC
+  ; **** COPIED FROM PREVIOUS WORK
   ; takes:
   ; dl -> byte to print as hex
   ; causes: prints dl as hex
@@ -151,77 +177,69 @@ HexOutByte PROC
   ret
 HexOutByte ENDP
 
+PrintNHexChars PROC
+  ; IN: ds:dx -> buffer
+  ;     cx    -> N
+  ; OUT: prints ds:dx
+
+  push si
+  push dx
+  push cx
+  mov si, dx
+l:
+  mov dl, [si]
+  call HexOutByte
+  inc si
+  call space
+  loop l
+  pop cx
+  pop dx
+  pop si
+  ret
+PrintNHexChars ENDP
+
 HexOutSplit PROC
   ; IN: ax -> number of bytes to print before splitting
+  ;     bx -> line length
   ;     cx -> number of bytes to print
   ;     ds:dx -> buffer
   ; OUT: prints DS:DX
 
+  push ax
   push bx
   push cx
   push dx
+  push si
 
+  cmp cx, ax
+  jb after
+  ; print AX chars
   push cx
-  shr cx, 1		; Divide CX by 2.
-  cmp cx, ax		; Is CX < AX?
-  pop cx		; (doesn't modify flags)
-  jl print_remainder	; goto print_remainder if true.
-  sub cx, ax		; Subtract AX from CX.
-			; This allows execution to fall into
-			; print_remainder safely
-
-  push cx
-  mov cx, ax		; Follow HexOut calling convention
-  call HexOut		; Print AX bytes
+  mov cx, ax
+  call PrintNHexChars
   pop cx
-
+  sub cx, ax
+  sub bx, ax
   call space
+after:
+  call PrintNHexChars
+  sub bx, cx
+  
+  cmp bx, 0
+  je finish
 
-  add dx, ax		; Advance buffer beyond split
-
-print_remainder:
-  call HexOut		; Print CX bytes
-
-  cmp ax, cx		; If we didn't print AX bytes again
-  je done
-
-  push ax
-  sub ax, cx		; Calculate how many
-  mov cx, ax		; spaces we need to pad the end into CX
-lp:
+  mov cx, bx
+l2:
   call space
-  loop lp
-  pop ax
+  call space
+  call space
+  loop l2
 
-done:
+finish:
+  pop si
   pop dx
   pop cx
   pop bx
+  pop ax
   ret
 HexOutSplit ENDP
-
-HexOut PROC
-  ; IN: cx -> number of bytes
-  ;     ds:dx -> buffer
-  ; OUT: prints DS:DX
-
-  push bx
-  push cx
-  push dx
-
-  mov bx, dx
-top:
-  mov dl, [bx]
-  call HexOutByte
-  call space
-
-  inc bx
-  loop top
-
-  pop dx
-  pop cx
-  pop bx
-  ret
-HexOut ENDP
-
-

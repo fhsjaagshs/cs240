@@ -17,12 +17,6 @@ args PROC
   push si
 
   call getcmdtail
-
-  push bx
-  mov bx, 1
-  call DumpMem
-  pop bx
-
   call nullify
 
   mov cx, 128
