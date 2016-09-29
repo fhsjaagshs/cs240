@@ -81,6 +81,44 @@ HexOutNybble ENDP
 
 ;; TODO: copy HexOutByte
 
+HexOutByte PROC
+  ; takes:
+  ; dl -> byte to print as hex
+  ; causes: prints dl as hex
+
+  push dx
+
+  mov dh, dl		; Copy DL to DH for below algorithm
+
+  ; the below algorithm:
+  ; we read the character into both DL
+  ; and DH so that it appears like so:
+  ; DX: <highnybble><lownybble><highnybble><lownybble>
+  ;
+  ; then we shift DX right by four:
+  ; DX: 0000<highnybble><lownybble><highnybble>
+  ;
+  ; then `call HexOutNybble` to print the high nybble
+  ;
+  ; shifting right by 4 again causes:
+  ; DX: 00000000<highnybble><lownybble>
+  ;
+  ; then `call HexOutNybble` to print the low nybble.
+  ;
+  ; Now we've printed the byte in order.
+
+  push cx
+  mov cl, 4		; (for the shr instruction)
+  shr dx, cl		; Shift dx right 4 bits to
+  call HexOutNybble	; print the high nybble.
+  shr dx, cl		; Shift dx right 4 more bits to
+  call HexOutNybble	; print the low nybble.
+  pop cx
+  pop dx
+  ret
+HexOutByte ENDP
+
+
 HexOutSplit PROC
   ; IN: ax -> number of bytes to print before splitting
   ;     cx -> number of bytes to print
