@@ -1,15 +1,14 @@
 TITLE	hexdump.asm
 
 ; Author: Nathaniel Symer
-; Last update: 9.21.2016
+; Last update: 9.28.2016
 ;
-; Works just like hexdump -C.
-;
-; Stores a 32-bit offset
+; Works just like hexdump -C on Linux.
 
 INCLUDE Irvine16.inc
 INCLUDE argv.inc
 INCLUDE files.inc
+INCLUDE printing.inc
 
 .8086
 .stack 4096
@@ -18,9 +17,6 @@ INCLUDE files.inc
 args BYTE 128 DUP(0)
 argtable BYTE 64 DUP(0) ; Max # args = 64 single character args.
 argc BYTE 0
-
-bytes BYTE 16 DUP(0)	; The 16 bytes we're currently printing.
-offset DWORD 0
 
 .code
 main PROC
@@ -55,12 +51,67 @@ main ENDP
 
 hexdump PROC
   ; IN: bx -> file handle
+.data
+foffset DWORD 0		; Offset in file
+buffer BYTE 16 DUP(0)	; Current hexdump line
+.code
 
 top:
-  
+  ;; TODO: print offset
+  mov dx, OFFSET foffset
+  call PrintUnsigned32
 
+  mov cx, 16			; Attempt to read 16 bytes
+  mov dx, OFFSET buffer		; into file buffer
+  call FReadAdv			; TODO: error handling!
+
+  cmp cx, 0			; Are we at the EOF?
+  je done			; If we are, we're done.
+
+  mov dx, OFFSET foffset	; Update the offset WRT CX from FReadAdv
+  call AddOffset		;
+
+  call space
+  call space
+
+  mov dx, OFFSET buffer		; Load file buffer offset into DX
+  mov ax, 8			; Set the number of chars before a split.
+  call HexOutSplit		; Print the line (CX already set by FReadAdv)
+
+  call space
+  call space
+
+  call pipe
+  call PrintHumanReadable
+  call pipe
+  call newline
+
+  jmp top
+done:
   ret
 hexdump ENDP
+
+AddOffset PROC
+  ; IN: cl -> byte to add
+  ;     ds:dx -> pointer to 32bit number
+  ; OUT: modifies ds:dx to reflect adding CL
+
+  push ax
+  push bx
+
+  mov bx, dx		; Move DX to BX so we can access memory.
+  mov ax, [bx+2]	; Load low bytes of 32bit num into AX
+  adc ax, cl
+  mov [bx+2], ax	; Load low bytes back into memory. Flags unmodified.
+  jnc after		; If we carry over into the high bytes,
+  mov ax, [bx]		; load the high bytes
+  inc ax		; Add the carry
+  mov [bx], ax		; load back into memory
+after:
+  pop bx
+  pop ax
+  ret
+AddOffset PROC
 
 ; PRINTING ALGO (some is Haskell pseudocode)
 ; 1. Print offset
