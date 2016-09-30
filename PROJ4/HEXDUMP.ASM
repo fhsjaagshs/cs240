@@ -55,6 +55,7 @@ main ENDP
 
 hexdump PROC
   ; IN: bx -> file handle
+  ; OUT: prints hexdump
 .data
 foffset DWORD 0		; Offset in file
 buffer BYTE 16 DUP(0)	; Current hexdump line
@@ -65,18 +66,19 @@ buffer BYTE 16 DUP(0)	; Current hexdump line
   push cx
   push dx
 
-;  mov dx, OFFSET foffset	; Load offset into DX
-;  call PrintUnsigned32		; Print it
+top:
+  mov dx, OFFSET foffset	; Load offset into DX
+  call PrintUnsigned32		; Print it
 
   mov cx, 16			; Attempt to read 16 bytes
   mov dx, OFFSET buffer		; into file buffer
   call FReadAdv			; TODO: error handling!
 
-  cmp cx, 0			; Are we at the EOF?
-  je done			; If we are, we're done.
-
   mov dx, OFFSET foffset	; Update the offset WRT CX from FReadAdv
   call AddOffset		;
+
+  cmp cx, 0			; Are we at the EOF?
+  je done			; If we are, we're done.
 
   call space
   call space
@@ -98,7 +100,7 @@ buffer BYTE 16 DUP(0)	; Current hexdump line
   call pipe
   call newline
 
-  call hexdump
+  jmp top
 done:
   pop dx
   pop cx

@@ -75,8 +75,81 @@ PrintUnsigned32 PROC
   ; IN: ds:dx -> ptr to 32-bit number in memory
   ; OUT: prints it!
 
+  push ax
+  push bx
+  push cx
+  push dx
+  push si
+
+  xor cx, cx
+  mov si, dx
+  mov ax, [si+2]
+  mov dx, [si]
+top:
+  call DivMod32_10
+  push bx
+  inc cx
+  cmp ax, 0
+  je low0
+  jmp top
+low0:
+  cmp dx, 0
+  ja top
+
+  mov ax, 8
+  sub ax, cx
+
+  push cx
+  mov cx, ax
+  mov dl, '0'
+  call PutNChar
+  pop cx
+
+l:
+  pop dx
+  add dl, '0'
+  call PutChar
+  loop l
+
+  pop si
+  pop dx
+  pop cx
+  pop bx
+  pop ax
+
   ret
 PrintUnsigned32 ENDP
+
+DivMod32_10 PROC
+  ; IN: ax -> low bytes
+  ;     dx -> high bytes
+  ; OUT: ax -> low bytes quotient
+  ;      dx -> high bytes quotient
+  ;      bx -> remainder
+  ; Divides (DX:AX)
+
+  push cx
+  mov cx, 10
+
+  ; high bytes
+  push ax
+  mov ax, dx	; Move DX into AX for division
+  xor dx, dx	; Clear DX
+  div cx	; Divide AX by 10, we can't get remainder in high bytes.
+  mov dx, ax	; Move AX back into DX
+  pop ax
+
+  ; low bytes
+  push dx
+  xor dx, dx	; Clear DX
+  div cx	; Divide AX by 10
+  mov bx, dx	; Move DX (remainder) into BX
+  pop dx
+
+  pop cx
+
+  ret
+DivMod32_10 ENDP
 
 ;;
 ;; ASCII PRINTING
