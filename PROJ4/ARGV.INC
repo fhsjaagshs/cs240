@@ -77,11 +77,14 @@ getcmdtail PROC
   push si
   push di
 
-  mov di, si
-  mov si, 81h		; Set SI to start of CMD tail
-
   xor cx, cx		; Clear CX
   mov cl, es:[80h]	; Read number of bytes in CMD tail
+
+  cmp cx, 0
+  je done
+
+  mov di, si
+  mov si, 81h		; Set SI to start of CMD tail
 
   push cx
 top:
@@ -92,8 +95,8 @@ top:
   loop top
   pop cx
 
+done:
   mov byte ptr [di], 0	; NULL terminate
-
   pop di
   pop si
   pop dx

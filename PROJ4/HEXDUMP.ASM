@@ -15,11 +15,23 @@ argv BYTE 128 DUP(0)
 argtable BYTE 64 DUP(0) ; Max # args = 64 single character args.
 argc WORD 0
 
+;; Harrison Sayre worked with me
+;; on error codes,
+iargs BYTE "Invalid arguments.", 0
+cantopen BYTE "Cannot access file.", 0
+unknown BYTE "unknown error", 0
 .code
 
 INCLUDE argv.inc
 INCLUDE files.inc
 INCLUDE printing.inc
+
+ErrorOut PROC
+; IN -> DS:DX -> error message
+  call PrintMine
+  mov ax, 4C00h	; Exit with non-zero code
+  int 21h
+ErrorOut ENDP
 
 main PROC
   mov ax, @data	; setup data segment
@@ -30,8 +42,6 @@ main PROC
   call args			; Read command line args.
   mov argc, cx			; Store the number of args in memory.
 
-  ; TODO: check for errors
-
   cmp argc, 1			; If we don't have exactly one argument
   jne invalid_args		; we have invalid args and need to exit.
 
@@ -40,17 +50,22 @@ main PROC
 				; This loads the location of the first arg
 				; into DX.
   call FOpen			; Open file specified by argument
+  jc open_file_error
   call hexdump			; print file as hex
   call FClose			; Close the file
-
-  jmp done
-invalid_args:
-  mov dl, '!'
-  call PutChar
-  ;; TODO: print error message
+  jc unknown_error
 done:
   mov ax, 4C00h	; Exit zero
   int 21h	; DOS interrupt with 4C00h
+open_file_error:
+  mov dx, OFFSET cantopen
+  call ErrorOut
+unknown_error:
+  mov dx, OFFSET unknown
+  call ErrorOut
+invalid_args:
+  mov dx, OFFSET iargs
+  call ErrorOut
 main ENDP
 
 hexdump PROC
@@ -73,6 +88,7 @@ top:
   mov cx, 16			; Attempt to read 16 bytes
   mov dx, OFFSET buffer		; into file buffer
   call FReadAdv			; TODO: error handling!
+  jc erroru
 
   mov dx, OFFSET foffset	; Update the offset WRT CX from FReadAdv
   call AddOffset		;
@@ -107,6 +123,9 @@ done:
   pop bx
   pop ax
   ret
+erroru:
+  mov dx, OFFSET unknown
+  call ErrorOut
 hexdump ENDP
 
 AddOffset PROC

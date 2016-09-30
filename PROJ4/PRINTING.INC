@@ -71,6 +71,27 @@ top:
   ret
 PrintHumanReadable ENDP
 
+PrintMine PROC
+; IN: DS:DX -> string
+  push dx
+  push si
+
+  mov si, dx		; Use source index instead of DX
+
+top:
+  mov dl, [si]		; Read a byte from our buffer.
+  cmp dl, 0		; Is it a null?
+  je done
+  call PutChar		; Print it human-readable.
+  inc si		; Advance buffer pointer.
+  jmp top
+
+done:
+  pop si
+  pop dx
+  ret
+PrintMine ENDP
+
 PrintUnsigned32 PROC
   ; IN: ds:dx -> ptr to 32-bit number in memory
   ; OUT: prints it!
