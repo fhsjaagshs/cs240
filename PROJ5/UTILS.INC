@@ -63,3 +63,66 @@ _itoa PROC
   ret
 _itoa ENDP
 
+_gettime PROC
+.data
+mspercs WORD 10
+mspers WORD 1000
+msperm WORD 60000
+sperh WORD 3600
+.code
+  ; OUT: dx:ax -> number of miliseconds since midnight
+
+  push bx
+  push cx
+  push si
+
+  mov ah, 2Ch
+  int 21h
+
+  mov bx, dx			; Protect seconds/100seconds from mul instruction
+
+  xor ax, ax			; Clear DX:AX (sum)
+  xor dx, dx			;
+  mov al, bl			; Move BL into AL
+  mov si, OFFSET mspercs	; Load our conversion factor
+  mul word ptr [si]		; and convert.
+  push dx			;
+  push ax			; push the product
+
+  xor ax, ax
+  xor dx, dx
+  mov al, bh
+  mov si, OFFSET mspers
+  mul word ptr [si]
+  push dx
+  push ax
+
+  xor ax, ax
+  xor dx, dx
+  mov al, cl
+  mov si, OFFSET msperm
+  mul word ptr [si]
+  push dx
+  push ax
+
+  xor ax, ax
+  xor dx, dx
+  mov al, ch
+  mov si, OFFSET sperh
+  mul word ptr [si]
+  mov si, OFFSET mspers
+  mul word ptr [si]
+
+  ; add accumulated parts
+  call _add32
+  call _add32
+  call _add32
+
+  pop si
+  pop cx
+  pop bx
+
+  ret
+_gettime ENDP
+
+

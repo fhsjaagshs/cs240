@@ -16,7 +16,6 @@ INCLUDE utils.inc
 
 ;; TODO:
 ; 1. Safety
-; 2. Insert
 SafeRead PROC
   ; Read chars from the KB and place them
   ; in a supplied buffer
@@ -74,7 +73,7 @@ char:
 
   mov [bx], dl		; Write ASCII value to buffer 
   inc cx		; increment str length
-  call WriteBufTTY
+  call WriteBufTTY      ; everything shifted right, so we have to re-print
   jmp top 
 right:
   ; TODO: prevent exceeding buffer here
@@ -225,103 +224,6 @@ top:
   ret
 MyDelay ENDP
 
-_gettime PROC
-.data
-mspercs WORD 10
-mspers WORD 1000
-msperm WORD 60000
-sperh WORD 3600
-.code
-  ; OUT: dx:ax -> number of miliseconds since midnight
-
-  push bx
-  push cx
-  push si
-
-  mov ah, 2Ch
-  int 21h
-
-  mov bx, dx			; Protect seconds/100seconds from mul instruction
-
-  xor ax, ax			; Clear DX:AX (sum)
-  xor dx, dx			;
-  mov al, bl			; Move BL into AL
-  mov si, OFFSET mspercs	; Load our conversion factor
-  mul word ptr [si]		; and convert.
-  push dx			;
-  push ax			; push the product
-
-  xor ax, ax
-  xor dx, dx
-  mov al, bh
-  mov si, OFFSET mspers
-  mul word ptr [si]
-  push dx
-  push ax
-
-  xor ax, ax
-  xor dx, dx
-  mov al, cl
-  mov si, OFFSET msperm
-  mul word ptr [si]
-  push dx
-  push ax
-
-  xor ax, ax
-  xor dx, dx
-  mov al, ch
-  mov si, OFFSET sperh
-  mul word ptr [si]
-  mov si, OFFSET mspers
-  mul word ptr [si]
-
-  ; add accumulated parts
-  call _add32
-  call _add32
-  call _add32
-
-  pop si
-  pop cx
-  pop bx
-
-  ret
-_gettime ENDP
-
-_add32 PROC
-  ; STDCALL
-  ; IN: [bp+6]:[bp+4] -> a 32-bit number
-  ;     dx:ax	      -> another 32-bit number
-  ; OUT: dx:ax	      -> sum
-  push bp
-  mov bp, sp
-
-  add dx, [bp+6]	; Add high bytes
-  adc ax, [bp+4]	; Add low bytes
-  jnc done		; Skip high byte increment if we don't have a carry
-  inc dx		; Increment high bytes to satisfy carry
-done:
-  pop bp
-  ret 4
-_add32 ENDP
-
-_atoi PROC
-  ; IN: DS:SI -> Pointer to ASCIIZ string on data segment
-  ; OUT: ax -> read unsigned word
-  mov ax, 0
-  ret
-_atoi ENDP
-
-_itoa PROC
-  ; IN: AX -> unsigned word
-  ;     DS:SI -> buffer
-  ; OUT: DS:SI will contain AX printed as ASCIIZ.
-  push ax
-  mov ax, 0
-  mov [si], ax
-  pop ax
-  ret
-_itoa ENDP
-
 main PROC
 .data
 buf BYTE 128 DUP(0)
@@ -356,9 +258,4 @@ buf BYTE 128 DUP(0)
   int 21h	; DOS interrupt with 4C00h
 main ENDP
 END main
-
-
-
-
-
 
