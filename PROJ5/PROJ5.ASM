@@ -233,10 +233,9 @@ buf BYTE 128 DUP(0)
   push si		; |
   push cx		; | setup params for SafeRead
   call SafeRead		; Reads into DS:SI
-  mov dx, si
-  call WriteString
-;  call _atoi		; which is used to calculate a word in AX
-;  push ax		; which is pushed.
+  call _atoi
+  call DumpRegs
+  call WriteInt
 
 ;  mov si, OFFSET buf
 ;  push si

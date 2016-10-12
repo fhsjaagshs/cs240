@@ -74,20 +74,33 @@ _add32 ENDP
 _atoi PROC
   ; IN: DS:SI -> Pointer to ASCIIZ string on data segment
   ; OUT: ax -> read unsigned word
-  mov ax, 0
+  push bx
+  push cx
+  push dx
+  push si
+  xor cx, cx
+  xor ax, ax
+  mov bx, 10
+top:
+  mov cl, [si]
+  cmp cl, 0
+  je done
+  cmp cl, '0'
+  jb done
+  cmp cl, '9'
+  ja done
+  inc si
+  sub cl, '0'
+  mul bx
+  add ax, cx
+  jmp top
+done:
+  pop si
+  pop dx
+  pop cx
+  pop bx
   ret
 _atoi ENDP
-
-_itoa PROC
-  ; IN: AX -> unsigned word
-  ;     DS:SI -> buffer
-  ; OUT: DS:SI will contain AX printed as ASCIIZ.
-  push ax
-  mov ax, 0
-  mov [si], ax
-  pop ax
-  ret
-_itoa ENDP
 
 _gettime PROC
 .data
