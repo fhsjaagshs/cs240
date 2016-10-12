@@ -12,30 +12,11 @@ INCLUDE Irvine16.inc
 .code
 
 INCLUDE console.inc
+INCLUDE utils.inc
 
-_memcpy PROC
-  ; IN: ds:si -> source buffer
-  ;     ds:di -> destination buffer
-  ;     cx    -> number of bytes to copy
-  push ax
-  push cx
-  push di
-  push si
-
-top:
-  mov ax, [si]
-  mov [di], ax
-  inc si
-  inc di
-  loop top
-
-  pop si
-  pop di
-  pop cx
-  pop ax
-  ret
-_memcpy ENDP
-
+;; TODO:
+; 1. Safety
+; 2. Insert
 SafeRead PROC
   ; Read chars from the KB and place them
   ; in a supplied buffer
@@ -61,17 +42,48 @@ top:
   cmp dh, 0Eh		; is it a backspace?
   je backspace
   cmp dh, 4Bh 		; is it a left arrow?
-  je leftarrow
+  je left
   cmp dh, 4Dh		; is it a right arrow
-  je rightarrow
+  je right
   cmp dh, 2Eh		; is it a control-c?
   je ctrlc
   cmp dh, 1Ch		; is it an enter?
   je done
-  mov [bx], dl
-  call WriteTTY
-  inc cx
-  jmp rightarrow
+char:
+  push si
+  push di
+  push cx
+  push dx
+  mov dx, -1		; Set up _memcpy step
+  add si, cx		; Move SI to the last index in the str
+  dec si		;
+  mov di, si		; Set up DI one byte farther away from
+  inc di		; beginning of buffer
+
+  push si		; |
+  add si, cx		; |
+  sub si, bx		; | Calculate the number of chars between the
+  mov cx, si		; | cursor and the end of the string.
+  pop si		; |
+
+  call _memcpy          ; do the copy
+  pop dx
+  pop cx
+  pop di
+  pop si
+
+  mov [bx], dl		; Write ASCII value to buffer 
+  inc cx		; increment str length
+  call WriteBufTTY
+  jmp top 
+right:
+  ; TODO: prevent exceeding buffer here
+  inc bx
+  push cx
+  mov cx, 1
+  call MoveCursor
+  pop cx
+  jmp top
 backspace:
   push cx		; |
   xor cx, cx		; |
@@ -81,19 +93,23 @@ backspace:
 
   push cx
 
-  push si
-  add si, cx
-  sub si, bx
-  mov cx, si	; how many chars between cursor and end of str
-  pop si
+  push si		; |
+  add si, cx		; |
+  sub si, bx		; | Calculate the number of chars between the
+  mov cx, si		; | cursor and the end of the string.
+  pop si		; |
 
   push si
   push di
-  mov si, bx
-  mov di, si
-  dec di
-  call _memcpy
-  mov bx, di
+  push dx
+			; | Shift chars after BX back one byte to signify backspace
+  mov si, bx		; Move BX into SI
+  mov di, si		; Move SI into DI
+  dec di		; Decrement DI
+  mov dx, 1		; Set _memcpy step amount 
+  call _memcpy		; do the copy
+  mov bx, di            ; Move DI into BX
+  pop dx
   pop di
   pop si
 
@@ -104,7 +120,7 @@ backspace:
   dec cx
 
   jmp top
-leftarrow:
+left:
 ;  cmp bx, si
 ;  jle skipl
   dec bx
@@ -113,14 +129,6 @@ leftarrow:
   call MoveCursor
   pop cx
 skipl:
-  jmp top
-rightarrow:
-  ; TODO: prevent exceeding buffer here
-  inc bx
-  push cx
-  mov cx, 1
-  call MoveCursor
-  pop cx
   jmp top
 done:
   add si, cx
