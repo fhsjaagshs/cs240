@@ -58,26 +58,24 @@ WriteBufTTY PROC
   push bx
   push cx
   push dx
-
+  cmp cx, 0
+  je after
 top:
   mov dl, [bx]
   inc bx
   call WriteTTY
   push cx
-  xor cx, cx
   mov cl, 1
   call MoveCursor
   pop cx
   loop top
-
-  mov dl, 0
-  call WriteTTY
-
+after:
   pop dx
   pop cx
   pop bx
 
   push cx
+;  dec cx
   neg cx
   call MoveCursor
   pop cx

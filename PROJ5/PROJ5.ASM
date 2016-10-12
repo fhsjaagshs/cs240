@@ -51,80 +51,81 @@ top:
 char:
   push si
   push di
+  push ax
   push cx
-  push dx
-  mov dx, -1		; Set up _memcpy step
-  add si, cx		; Move SI to the last index in the str
-  dec si		;
-  mov di, si		; Set up DI one byte farther away from
-  inc di		; beginning of buffer
 
-  push si		; |
-  add si, cx		; |
-  sub si, bx		; | Calculate the number of chars between the
-  mov cx, si		; | cursor and the end of the string.
-  pop si		; |
+  mov ax, cx
 
-  call _memcpy          ; do the copy
-  pop dx
+  push bx
+  sub bx, si		; BX - SI = chars up to cursor
+  sub cx, bx		; Store chars after cursor in CX
+  pop bx
+
+  add si, ax
+  mov di, si		; DI points to byte beyond end of string
+  dec si		; SI points to byte at end of string
+
+  call _memcpyreverse   ; do the copy
+
   pop cx
+  pop ax
   pop di
   pop si
 
-  mov [bx], dl		; Write ASCII value to buffer 
+  mov [bx], dl		; Write ASCII value to buffer
   inc cx		; increment str length
   call WriteBufTTY      ; everything shifted right, so we have to re-print
-  jmp top 
 right:
   ; TODO: prevent exceeding buffer here
   inc bx
   push cx
-  mov cx, 1
+  mov cl, 1
   call MoveCursor
   pop cx
   jmp top
 backspace:
-  push cx		; |
-  xor cx, cx		; |
-  mov cl, -1		; | Move cursor back a character
-  call MoveCursor	; |
-  pop cx		; |
+  dec bx
+  push cx
+  mov cl, -1
+  call MoveCursor
+  pop cx
 
   push cx
 
-  push si		; |
-  add si, cx		; |
-  sub si, bx		; | Calculate the number of chars between the
-  mov cx, si		; | cursor and the end of the string.
-  pop si		; |
+  push bx
+  sub bx, si		; BX - SI = chars up to cursor
+  sub cx, bx		; Store chars after cursor in CX
+ ; dec cx		; Store number of chars not to be deleted in CX.
+			; This value will be used with _memcpy below.
+  pop bx
 
   push si
   push di
-  push dx
-			; | Shift chars after BX back one byte to signify backspace
-  mov si, bx		; Move BX into SI
-  mov di, si		; Move SI into DI
-  dec di		; Decrement DI
-  mov dx, 1		; Set _memcpy step amount 
-  call _memcpy		; do the copy
-  mov bx, di            ; Move DI into BX
-  pop dx
+  mov si, bx
+  inc si		; SI points to first char not to be deleted.
+  mov di, bx		; DI points to the char to be deleted.
+  call _memcpy
+  add di, cx
+  dec di
+  mov cx, 0
+  mov [di], cx
   pop di
   pop si
-
-  call WriteBufTTY
-
   pop cx
 
-  dec cx
+  push bx
+  mov bx, si
+  call WriteBufTTY	; Write str at SI to console
+  pop bx
 
+  dec cx
   jmp top
 left:
 ;  cmp bx, si
 ;  jle skipl
   dec bx
   push cx
-  mov cx, -1
+  mov cl, -1
   call MoveCursor
   pop cx
 skipl:
@@ -141,6 +142,7 @@ done:
   pop cx
   pop bx
   pop ax
+
   pop bp
   ret 4
 ctrlc:

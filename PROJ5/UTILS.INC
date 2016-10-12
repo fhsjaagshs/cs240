@@ -7,26 +7,52 @@
 _memcpy PROC
   ; IN: ds:si -> source buffer
   ;     ds:di -> destination buffer
-  ;     dx    -> copy step amount (signed)
   ;     cx    -> number of units to copy
+  cmp cx, 0
+  je done
+
   push ax
   push cx
   push di
   push si
-
 top:
-  mov ax, [si]
-  mov [di], ax
-  add si, dx
-  add di, dx
+  mov al, byte ptr [si]
+  mov byte ptr [di], al
+  inc si
+  inc di
   loop top
-
   pop si
   pop di
   pop cx
   pop ax
+done:
   ret
 _memcpy ENDP
+
+_memcpyreverse PROC
+  ; IN: ds:si -> source buffer
+  ;     ds:di -> destination buffer
+  ;     cx    -> number of units to copy
+  cmp cx, 0
+  je done
+
+  push ax
+  push cx
+  push di
+  push si
+top:
+  mov al, byte ptr [si]
+  mov byte ptr [di], al
+  dec si
+  dec di
+  loop top
+  pop si
+  pop di
+  pop cx
+  pop ax
+done:
+  ret
+_memcpyreverse ENDP
 
 _add32 PROC
   ; STDCALL
