@@ -13,30 +13,28 @@ INCLUDE Irvine16.inc
 
 INCLUDE console.inc
 
-_shiftbufl PROC
-  ; IN: ds:bx -> buffer
-  ;     cx    -> how many characters to shift left
+_memcpy PROC
+  ; IN: ds:si -> source buffer
+  ;     ds:di -> destination buffer
+  ;     cx    -> number of bytes to copy
   push ax
-  push bx
   push cx
   push di
-
-  mov di, bx
-  inc bx
+  push si
 
 top:
-  mov ax, [bx]
+  mov ax, [si]
   mov [di], ax
+  inc si
   inc di
-  inc bx
   loop top
 
+  pop si
   pop di
   pop cx
-  pop bx
   pop ax
   ret
-_shiftbufl ENDP
+_memcpy ENDP
 
 SafeRead PROC
   ; Read chars from the KB and place them
@@ -86,14 +84,24 @@ backspace:
   push si
   add si, cx
   sub si, bx
-  mov cx, si
+  mov cx, si	; how many chars between cursor and end of str
   pop si
 
-  dec bx
-  call _shiftbufl
+  push si
+  push di
+  mov si, bx
+  mov di, si
+  dec di
+  call _memcpy
+  mov bx, di
+  pop di
+  pop si
+
   call WriteBufTTY
 
   pop cx
+
+  dec cx
 
   jmp top
 leftarrow:
@@ -115,9 +123,12 @@ rightarrow:
   pop cx
   jmp top
 done:
-  add bx, cx
-  mov cx, 0
-  mov [bx], cx
+  add si, cx
+  mov ax, 0
+  mov [si], ax		; null terminate
+  sub si, bx
+  mov cx, si
+  call MoveCursor
   pop si
   pop dx
   pop cx
