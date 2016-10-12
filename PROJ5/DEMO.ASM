@@ -42,6 +42,7 @@ buf BYTE 128 DUP(0)
   call FastMultiply	; Multiply pushed AXes.
   push ax
   mov ax, 1000		; Wait for a second before printing result
+  call MyDelay
   pop ax
   call WriteInt
 
