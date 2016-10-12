@@ -95,7 +95,6 @@ backspace:
   dec di
   call _memcpy
 
-
   mov si, bx
   add si, cx
   dec si
@@ -219,38 +218,4 @@ top:
   pop bp
   ret
 MyDelay ENDP
-
-main PROC
-.data
-buf BYTE 128 DUP(0)
-.code
-  mov ax, @data	; setup data segment
-  mov ds, ax	; make up for machine quirk
-
-  mov cx, 128		; setup buffer size
-
-  mov si, OFFSET buf	; setup buffer ptr
-  push si		; |
-  push cx		; | setup params for SafeRead
-  call SafeRead		; Reads into DS:SI
-  call _atoi
-  call DumpRegs
-  call WriteInt
-
-;  mov si, OFFSET buf
-;  push si
-;  push cx
-;  call SafeRead
-;  call _atoi
-;  push ax
-
-;  call FastMultiply	; Multiply pushed AXes.
-;  call _itoa		; Turn product into a string.
-;  mov dx, si		; |
-;  call WriteString	; | From Irvine16
-
-  mov ax, 4C00h	; Exit zero
-  int 21h	; DOS interrupt with 4C00h
-main ENDP
-END main
 

@@ -1,15 +1,12 @@
-all: proj5.exe
+all: demo.exe
 
-proj5.exe: proj5.asm console.inc utils.inc
-   ml /Fl proj5.asm irvine16.lib
+demo.exe: demo.asm proj5.asm console.inc utils.inc
+   ml /Fl demo.asm irvine16.lib
 
 clean:
    del *.exe
    del *.lst
    del *.obj
-
-
-
 
 
 
