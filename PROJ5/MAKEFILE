@@ -1,6 +1,6 @@
 all: proj5.exe
 
-proj5.exe: proj5.asm
+proj5.exe: proj5.asm console.inc
    ml /Fl proj5.asm irvine16.lib
 
 clean:

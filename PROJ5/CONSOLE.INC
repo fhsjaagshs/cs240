@@ -1,0 +1,172 @@
+;; cursor.inc
+;;
+;; Nathaniel Symer
+;;
+;; Provides utilities for controlling the cursor via BIOS
+
+MoveCursor PROC
+  ; IN: cl -> number of characters to move (signed)
+  ; OUT: moves the cursor accordingly
+  push ax
+  push bx
+
+  call CursorPosition	; Puts cursor position in (DL,DH)
+  add dl, cl		; Advance the cursor
+
+  ; At this point
+  ; Negative DL: move back a row
+  ; DL > AL:	 move forward a row
+  ; otherwise:   fine
+
+  call ScreenWidth	; Get screen width in AL
+  cmp dl, 0		; Is DL < 0?
+  jl backrow		; go to backrow if true
+  cmp dl, al		; Is DL > AL (column count)
+  jg advrow		; go to advrow if true
+  jmp afterwrap
+backrow:
+  cmp dh, 0
+  je afterwrap
+  dec dh
+  jmp afterwrap
+advrow:
+  inc dh
+afterwrap:
+  push ax
+  push sp
+  push bp
+  push si
+  push di
+  call PageNumber
+  mov ax, 0200h		; needs (DL,DH) setup
+  int 10h
+  pop di
+  pop si
+  pop bp
+  pop sp
+  pop ax
+  ret
+MoveCursor ENDP
+
+KeycodeToASCII PROC
+  ; IN: dx -> keycode
+  ; OUT: al -> ASCII code
+
+
+  ret
+KeycodeToASCII ENDP
+
+ReadTTY PROC
+  ; IN: nothing
+  ; OUT: dh -> scancode of pressed key
+  ;      dl -> ASCII char of pressed key
+  push ax
+  mov ah, 00h		; BIOS int 16h function code for reading key presses
+  int 16h		; Call BIOS
+  mov dx, ax
+  pop ax
+  ret
+ReadTTY ENDP
+
+WriteTTY PROC
+  ; IN: dl -> char to write
+  ; OUT: writes DL to the TTY at the cursor's current position
+  ;      
+  push ax
+  push bx
+
+  call PageNumber	; Get page number from screen props
+
+  mov ah, 0Eh		; BIOS interrupt code for "write to TTY".
+  mov al, dl		; Move DL to AL, BIOS expects char in AL.
+  mov bl, 1111b		; Ensure we print a white character.
+  int 10h		; Print the character to the TTY.
+
+  pop bx
+  pop ax
+  ret
+WriteTTY ENDP
+
+BackspaceTTY PROC
+  ; IN: nothing
+  ; OUT: prints a backspace to the TTY
+  push dx
+  mov dl, 08h
+  call WriteTTY
+  pop dx
+  ret
+BackspaceTTY ENDP
+
+BellTTY PROC
+  ; IN: Nothing
+  ; OUT: rings the TTY bell
+  push dx
+  mov dl, 07h
+  call WriteTTY
+  pop dx
+  ret
+BellTTY ENDP
+
+ScreenProps PROC
+  ; IN: nothing
+  ; OUT: AL -> video mode
+  ;      AH -> number of character columns per line
+  ;      BH -> Active display page number
+  push sp
+  push bp
+  push si
+  push di
+  mov ax, 0F00h
+  int 10h
+  pop di
+  pop si
+  pop bp
+  pop sp
+  ret
+ScreenProps ENDP
+
+PageNumber PROC
+  ; IN: nothing
+  ; OUT: bh -> Active display page number
+  push ax
+  call ScreenProps
+  pop ax
+  ret
+PageNumber ENDP
+
+ScreenWidth PROC
+  ; IN: nothing
+  ; OUT: ax -> width of screen in chars
+  push bx
+  call ScreenProps	; Get screen properties from BIOS
+  mov al, ah		; Move AH into AL
+  xor ah, ah		; Clear high byte
+  pop bx
+  ret
+ScreenWidth ENDP
+
+CursorPosition PROC
+  ; IN: nothing
+  ; OUT: dl -> column
+  ;      dh -> row
+
+  push ax
+  push cx
+  push sp
+  push bp
+  push si
+  push di
+
+  call ScreenProps	; Get the page number in BH
+  mov ax, 0300h		; Setup BIOS interrupt code & clear extra
+			; side effects from call ScreenProps
+  int 10h
+
+  pop di
+  pop si
+  pop bp
+  pop sp
+  pop cx
+  pop ax
+  ret
+CursorPosition ENDP
