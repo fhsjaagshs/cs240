@@ -14,8 +14,6 @@ INCLUDE Irvine16.inc
 INCLUDE console.inc
 INCLUDE utils.inc
 
-;; TODO:
-; 1. Safety
 SafeRead PROC
   ; Read chars from the KB and place them
   ; in a supplied buffer
@@ -76,7 +74,6 @@ char:
   inc cx		; increment str length
   call WriteBufTTY      ; everything shifted right, so we have to re-print
 right:
-  ; TODO: prevent exceeding buffer here
   inc bx
   push cx
   mov cl, 1
@@ -84,51 +81,48 @@ right:
   pop cx
   jmp top
 backspace:
-  dec bx
-  push cx
-  mov cl, -1
-  call MoveCursor
-  pop cx
-
   push cx
 
   push bx
   sub bx, si		; BX - SI = chars up to cursor
   sub cx, bx		; Store chars after cursor in CX
- ; dec cx		; Store number of chars not to be deleted in CX.
-			; This value will be used with _memcpy below.
   pop bx
 
   push si
   push di
-  mov si, bx
-  inc si		; SI points to first char not to be deleted.
+  mov si, bx		; SI points to first char not to be deleted.
   mov di, bx		; DI points to the char to be deleted.
-  call _memcpy
-  add di, cx
   dec di
+  call _memcpy
+
+
+  mov si, bx
+  add si, cx
+  dec si
   mov cx, 0
-  mov [di], cx
+  mov [si], cx
+
   pop di
   pop si
+
   pop cx
 
-  push bx
-  mov bx, si
-  call WriteBufTTY	; Write str at SI to console
-  pop bx
-
-  dec cx
-  jmp top
-left:
-;  cmp bx, si
-;  jle skipl
   dec bx
   push cx
   mov cl, -1
   call MoveCursor
   pop cx
-skipl:
+
+  call WriteBufTTY	; Write str at SI to console
+
+  dec cx
+  jmp top
+left:
+  dec bx
+  push cx
+  mov cl, -1
+  call MoveCursor
+  pop cx
   jmp top
 done:
   add si, cx
