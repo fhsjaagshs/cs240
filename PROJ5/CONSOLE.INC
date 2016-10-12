@@ -9,6 +9,11 @@ MoveCursor PROC
   ; OUT: moves the cursor accordingly
   push ax
   push bx
+  push dx
+  push sp
+  push bp
+  push si
+  push di
 
   call CursorPosition	; Puts cursor position in (DL,DH)
   add dl, cl		; Advance the cursor
@@ -28,33 +33,57 @@ backrow:
   cmp dh, 0
   je afterwrap
   dec dh
+  mov dl, al
   jmp afterwrap
 advrow:
+  mov dl, 0
   inc dh
 afterwrap:
-  push ax
-  push sp
-  push bp
-  push si
-  push di
   call PageNumber
-  mov ax, 0200h		; needs (DL,DH) setup
+  mov ax, 0200h
   int 10h
   pop di
   pop si
   pop bp
   pop sp
+  pop dx
+  pop bx
   pop ax
   ret
 MoveCursor ENDP
 
-KeycodeToASCII PROC
-  ; IN: dx -> keycode
-  ; OUT: al -> ASCII code
+WriteBufTTY PROC
+  ; IN ds:bx -> buffer
+  ;    cx    -> size of buffer
+  push bx
+  push cx
+  push dx
 
+top:
+  mov dl, [bx]
+  inc bx
+  call WriteTTY
+  push cx
+  xor cx, cx
+  mov cl, 1
+  call MoveCursor
+  pop cx
+  loop top
+
+  mov dl, 0
+  call WriteTTY
+
+  pop dx
+  pop cx
+  pop bx
+
+  push cx
+  neg cx
+  call MoveCursor
+  pop cx
 
   ret
-KeycodeToASCII ENDP
+WriteBufTTY ENDP
 
 ReadTTY PROC
   ; IN: nothing
@@ -71,17 +100,29 @@ ReadTTY ENDP
 WriteTTY PROC
   ; IN: dl -> char to write
   ; OUT: writes DL to the TTY at the cursor's current position
-  ;      
   push ax
   push bx
+  push cx
+  push sp
+  push bp
+  push si
+  push di
 
   call PageNumber	; Get page number from screen props
+  mov ah, 08h		; BIOS function to read char and attrs under the cursor
+  int 10h
+  mov bl, ah		; Move AH (attrs) into BL
 
-  mov ah, 0Eh		; BIOS interrupt code for "write to TTY".
-  mov al, dl		; Move DL to AL, BIOS expects char in AL.
-  mov bl, 1111b		; Ensure we print a white character.
-  int 10h		; Print the character to the TTY.
+  mov ah, 09h		; BIOS function code for write char (and attr) at cursor.
+  mov al, dl		; Setup our character
+  mov cx, 1		; We want to print only 1 of it.
+  int 10h		; Call BIOS
 
+  pop di
+  pop si
+  pop bp
+  pop sp
+  pop cx
   pop bx
   pop ax
   ret

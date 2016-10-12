@@ -13,13 +13,30 @@ INCLUDE Irvine16.inc
 
 INCLUDE console.inc
 
-;_cons PROC
-;  ; IN -> BX: a buffer
-;  ;       CX: number of bytes in BX
-;  ;       DL: byte to cons
-;  ; OUT -> cons DL to BX
-;  ret
-;_cons
+_shiftbufl PROC
+  ; IN: ds:bx -> buffer
+  ;     cx    -> how many characters to shift left
+  push ax
+  push bx
+  push cx
+  push di
+
+  mov di, bx
+  inc bx
+
+top:
+  mov ax, [bx]
+  mov [di], ax
+  inc di
+  inc bx
+  loop top
+
+  pop di
+  pop cx
+  pop bx
+  pop ax
+  ret
+_shiftbufl ENDP
 
 SafeRead PROC
   ; Read chars from the KB and place them
@@ -37,58 +54,80 @@ SafeRead PROC
   push dx
   push si
 
-  mov cx, [bp+4]	; Copy buffer length to CX
-  dec cx		; we need to be able to accommodate a null char
+  xor cx, cx
   mov si, [bp+6]	; Copy buffer offset to SI
   mov bx, si		; Mov SI to BX
+
 top:
   call ReadTTY		; Read a keycode into DH and ASCII code into DL
-  cmp dx, 0Eh		; is it a backspace?
+  cmp dh, 0Eh		; is it a backspace?
   je backspace
   cmp dh, 4Bh 		; is it a left arrow?
   je leftarrow
-  cmp dx, 4Dh		; is it a right arrow
+  cmp dh, 4Dh		; is it a right arrow
   je rightarrow
-  cmp dx, 2Eh		; is it a control-c?
+  cmp dh, 2Eh		; is it a control-c?
   je ctrlc
-  cmp dx, 1Ch		; is it an enter?
+  cmp dh, 1Ch		; is it an enter?
   je done
   mov [bx], dl
-  inc bx
   call WriteTTY
-  loop top
+  inc cx
+  jmp rightarrow
 backspace:
-  ; TODO: delete the char
-  ; and then it's okay to fall into leftarrow!
+  push cx		; |
+  xor cx, cx		; |
+  mov cl, -1		; | Move cursor back a character
+  call MoveCursor	; |
+  pop cx		; |
+
+  push cx
+
+  push si
+  add si, cx
+  sub si, bx
+  mov cx, si
+  pop si
+
+  dec bx
+  call _shiftbufl
+  call WriteBufTTY
+
+  pop cx
+
+  jmp top
 leftarrow:
-  cmp bx, si
-  jle skipl
+;  cmp bx, si
+;  jle skipl
   dec bx
   push cx
   mov cx, -1
   call MoveCursor
   pop cx
 skipl:
-  loop top
+  jmp top
 rightarrow:
   ; TODO: prevent exceeding buffer here
-
+  inc bx
   push cx
   mov cx, 1
   call MoveCursor
   pop cx
-  loop top
-ctrlc:
-  mov ax, 4C00h
-  int 21h
+  jmp top
 done:
+  add bx, cx
+  mov cx, 0
+  mov [bx], cx
   pop si
   pop dx
   pop cx
   pop bx
   pop ax
   pop bp
-  ret
+  ret 4
+ctrlc:
+  mov ax, 4C00h
+  int 21h
 SafeRead ENDP
 
 FastMultiply PROC
@@ -267,8 +306,6 @@ _itoa ENDP
 main PROC
 .data
 buf BYTE 128 DUP(0)
-word1 WORD 0
-word2 WORD 0
 .code
   mov ax, @data	; setup data segment
   mov ds, ax	; make up for machine quirk
@@ -279,6 +316,8 @@ word2 WORD 0
   push si		; |
   push cx		; | setup params for SafeRead
   call SafeRead		; Reads into DS:SI
+  mov dx, si
+  call WriteString
 ;  call _atoi		; which is used to calculate a word in AX
 ;  push ax		; which is pushed.
 
