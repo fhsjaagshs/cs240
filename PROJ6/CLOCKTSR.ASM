@@ -1,23 +1,51 @@
-TITLE	template.asm
+TITLE	clocktsr.asm
 
 ; Author: Nathaniel Symer
-; Last update: 9.15.2016
+; Last update: 10.18.2016
 ;
-; <DESC>
+; TSR version of clock.asm
 
-INCLUDE Irvine16.inc
 .8086
-.stack 4096
-.data
-.code
-main PROC
-  mov ax, @data	; setup data segment
-  mov ds, ax	; make up for machine quirk
+.model tiny
 
-  mov ax, 4C00h	; Exit zero
-  int 21h	; DOS interrupt with 4C00h
-main ENDP
-END main
+.code
+	org 100h
+
+top:	jmp start
+
+
+;;*****************************************************************************
+; BEGINNING OF INSTALLER
+;;*****************************************************************************
+install:
+
+INCLUDE inthdl.inc
+
+install_timer PROC
+
+  ret
+install_timer ENDP
+
+install_kb PROC
+
+  ret
+install_kb ENDP
+
+start:
+  call install_timer
+  call install_kb
+
+  mov dx, OFFSET install
+  mov cl, 4
+  shr dx, cl			; DX is bytes/16
+  inc dx			; DX is paragraphcs to reserve
+  mov ax, 3100h
+  int 21h
+
+end top
+
+
+
 
 
 
