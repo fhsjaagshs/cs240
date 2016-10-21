@@ -1,4 +1,4 @@
-;; CLOCKLOGIC.INC
+;; CLOGIC.INC
 ;;
 ;; Logic for printing a clock display in the upper right hand corner.
 ;;

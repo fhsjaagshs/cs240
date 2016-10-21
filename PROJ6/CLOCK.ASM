@@ -20,8 +20,8 @@ TITLE	clock.asm
 ; DOS/BIOS recognizes instances where
 ; this happens and it crashes intentionally.
 
-INCLUDE clocklogic.inc
-INCLUDE clockinstall.inc
+INCLUDE clogic.inc
+INCLUDE cinstall.inc
 
 main PROC
   mov ax, @data	; setup data segment

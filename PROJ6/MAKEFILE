@@ -1,9 +1,9 @@
 all: clock.exe clocktsr.com
 
-clock.exe: clock.asm console.inc inthdl.inc
+clock.exe: clock.asm console.inc inthdl.inc clogic.inc cinstall.inc
    ml /Fl clock.asm
 
-clocktsr.com: clocktsr.asm
+clocktsr.com: clocktsr.asm console.inc inthdl.inc clogic.inc cinstall.inc
    ml /Fl clocktsr.asm
 
 clean:

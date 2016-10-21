@@ -1,6 +1,7 @@
-;; CLOCKINSTALL.INC
+;; CINSTALL.INC
 ;;
-;; Logic for installing the necessary handlers to handle clock logic.
+;; Logic for installing the necessary handlers to handle clock logic
+;; using CLOGIC.INC.
 
 INCLUDE inthdl.inc
 

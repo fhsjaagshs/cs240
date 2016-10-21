@@ -15,14 +15,14 @@ top:
   jmp start
 
 
-INCLUDE clocklogic.inc
+INCLUDE clogic.inc
 
 ;;*****************************************************************************
 ; BEGINNING OF INSTALLER
 ;;*****************************************************************************
 install:
 
-INCLUDE clockinstall.inc
+INCLUDE cinstall.inc
 
 start:
   call installinthandlers  
