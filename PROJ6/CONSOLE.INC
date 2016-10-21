@@ -13,12 +13,11 @@ MoveCursor PROC
   push bx
   push dx
 
-  call CursorPosition	; Puts cursor position in (DL,DH)
+  call CursorPosition	; Get cursor position in (DL, DH)
+  call ScreenProps	; Get screen width in AH and page # in BH
   add dl, cl		; Advance the cursor
-
-  call ScreenProps	; Get screen width in AH
-  cmp dl, ah		; IF DL > AH (column count)
-  jg advrow		; Move forward a row.
+  cmp dl, ah		; IF DL >= AH (column count)
+  jge advrow		; Move forward a row.
   cmp dl, 0		; IF DL >= 0?
   jge afterwrap		; Don't change rows.
   			; ELSE to decrementing a row.
@@ -64,8 +63,8 @@ MoveCursorTo PROC
   push si
   push di
 
-  call PageNumber
-  mov ah, 02h
+  call ScreenProps
+  mov ax, 0200h
   int 10h
 
   pop di
@@ -102,7 +101,9 @@ WriteConsole PROC
   push si
   push di
 
-  call PageNumber	; Put the page number in BH.
+  push ax
+  call ScreenProps	; Put the page number in BH.
+  pop ax
   mov al, dl		; Put the char to print in AL.
   mov cx, 1		; Print the char once.
   mov ah, 0Ah		; BIOS interrupt code to print without attrs.
@@ -138,27 +139,6 @@ ScreenProps PROC
   ret
 ScreenProps ENDP
 
-PageNumber PROC
-  ; IN: nothing
-  ; OUT: bh -> Active display page number
-  push ax
-  call ScreenProps
-  pop ax
-  ret
-PageNumber ENDP
-
-ScreenWidth PROC
-  ; IN: nothing
-  ; OUT: ah -> width of screen in chars
-  push bx
-  push ax
-  call ScreenProps	; Get screen properties from BIOS
-  mov al, ah		; Move AH into AL
-  xor ah, ah		; Clear high byte
-  pop bx
-  ret
-ScreenWidth ENDP
-
 CursorPosition PROC
   ; IN: nothing
   ; OUT: dl -> column
@@ -184,3 +164,4 @@ CursorPosition PROC
   pop ax
   ret
 CursorPosition ENDP
+

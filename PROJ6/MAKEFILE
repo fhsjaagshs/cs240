@@ -1,7 +1,7 @@
 all: clock.exe clocktsr.com
 
-clock.exe: clock.asm
-   ml /Fl clock.asm irvine16.lib
+clock.exe: clock.asm console.inc inthdl.inc
+   ml /Fl clock.asm
 
 clocktsr.com: clocktsr.asm
    ml /Fl clocktsr.asm

@@ -5,7 +5,7 @@ TITLE	clock.asm
 ;
 ; Displays a clock in the upper right hand corner.
 
-INCLUDE Irvine16.inc
+.model small
 .8086
 .stack 4096
 .data
@@ -19,8 +19,6 @@ INCLUDE Irvine16.inc
 ; in the data segment. I'm guessing
 ; DOS/BIOS recognizes instances where
 ; this happens and it crashes intentionally.
-orig_handle08 DWORD 0
-orig_handle09 DWORD 0
 
 INCLUDE inthdl.inc
 INCLUDE console.inc
@@ -29,49 +27,161 @@ main PROC
   mov ax, @data	; setup data segment
   mov ds, ax	; make up for machine quirk
 
-  ; Handler Installation
-  push es
-
-;  push cs		; push the code segment
-;  pop es		; and pop it into the extra segment
-;  mov al, 09h		; Keyboard input interrupt
-;  mov dx, OFFSET handlekb
-;  call installhandler
-;  mov word ptr orig_handle09, bx
-;  mov word ptr orig_handle09+2, es
-;
-;  push cs		; push the code segment
-;  pop es		; and pop it into the extra segment
-;  mov al, 08h		; System timer interrupt
-;  mov dx, offset handletimer
-;  call installhandler
-;  mov word ptr orig_handle08, bx
-;  mov word ptr orig_handle08+2, es
-
-  pop es
-
+  call install08
+  call install09
   call PrintClockURHCorner
-
 waiter:
   call ReadConsole
   cmp dh, 2Eh		; CTRL-C
   jne waiter
 
+  call uninstall09
+  call uninstall08
+
   mov ax, 4C00h	; Exit zero
   int 21h	; DOS interrupt with 4C00h
 main ENDP
 
+orig_handle08 DWORD 0
+orig_handle09 DWORD 0
+
+show_clock BYTE 1
+
+readzero PROC
+  ; IN si -> Byte index relative to 0 you want to read
+  ; OUT dl -> byte at 0:si
+  push es
+
+  ; Sets ES to 0
+  push dx
+  mov dx, 0
+  push dx
+  pop es
+  pop dx
+
+  mov dl, es:[si]
+  pop es
+  ret
+readzero ENDP
+
 handlekb PROC
   pushf
   call orig_handle09
+
+  push dx
+  push si
+  push ax
+  xor ax, ax
+  mov si, 0417h		; Read shift byte
+  call readzero
+  add al, dl
+  mov si, 0418h		; Read extended shift byte
+  call readzero
+  add al, dl
+  cmp al, 3		; 3 means both shifts are pressed
+  jne done
+  xor [show_clock], 00000001b	; Toggle show_clock
+done:
+  pop ax
+  pop si
+  pop dx
   iret
 handlekb ENDP
 
 handletimer PROC
   pushf
   call orig_handle08
+  cmp [show_clock], 0
+  je noclock
+  call PrintClockURHCorner
+  jmp done
+noclock:
+  ; TODO: blot out bytes
+done:
   iret
 handletimer ENDP
+
+install08 PROC
+  push es
+  push ax
+  push bx
+  push dx
+
+  push cs		; push the code segment
+  pop es		; and pop it into the extra segment
+  mov al, 08h
+  mov dx, OFFSET cs:handletimer
+  call installhandler
+  mov word ptr cs:orig_handle08, bx
+  mov word ptr cs:orig_handle08+2, es
+
+  pop dx
+  pop bx
+  pop ax
+  pop es
+  ret
+install08 ENDP
+
+uninstall08 PROC
+  push es
+  push ax
+  push bx
+  push dx
+
+  mov ax, word ptr cs:orig_handle08+2
+  push ax
+  pop es
+  mov al, 08h
+  mov dx, word ptr cs:orig_handle08
+  call installhandler
+
+  pop dx
+  pop bx
+  pop ax
+  pop es
+  ret
+uninstall08 ENDP
+
+install09 PROC
+  push es
+  push ax
+  push bx
+  push dx
+
+  push cs		; push the code segment
+  pop es		; and pop it into the extra segment
+  mov al, 09h
+  mov dx, OFFSET cs:handlekb
+  call installhandler
+  mov word ptr cs:orig_handle09, bx
+  mov word ptr cs:orig_handle09+2, es
+
+  pop dx
+  pop bx
+  pop ax
+  pop es
+  ret
+install09 ENDP
+
+uninstall09 PROC
+  push es
+  push ax
+  push bx
+  push dx
+
+  mov ax, word ptr cs:orig_handle09+2
+  push ax
+  pop es
+  mov al, 09h
+  mov dx, word ptr cs:orig_handle09
+  call installhandler
+
+  pop dx
+  pop bx
+  pop ax
+  pop es
+  ret
+uninstall09 ENDP
 
 PrintClockURHCorner PROC
   push ax
