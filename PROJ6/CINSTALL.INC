@@ -1,5 +1,4 @@
 ;; CINSTALL.INC
-;;
 ;; Logic for installing the necessary handlers to handle clock logic
 ;; using CLOGIC.INC.
 
@@ -47,7 +46,6 @@ install08 PROC
   call installhandler
   mov word ptr cs:orig_handle08, bx
   mov word ptr cs:orig_handle08+2, es
-
   pop dx
   pop bx
   pop ax
@@ -115,4 +113,10 @@ uninstall09 PROC
   pop es
   ret
 uninstall09 ENDP
+
+
+
+
+
+
 

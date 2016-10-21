@@ -7,32 +7,28 @@ TITLE	clocktsr.asm
 
 .8086
 .model tiny
-
+.stack 4096
 .code
   org 100h
-
-top:
+main:
   jmp start
-
 
 INCLUDE clogic.inc
 
-;;*****************************************************************************
-; BEGINNING OF INSTALLER
-;;*****************************************************************************
 install:
 
 INCLUDE cinstall.inc
 
 start:
-  call installinthandlers  
+  call installinthandlers
 
   mov dx, OFFSET install
   mov cl, 4
   shr dx, cl			; DX is bytes/16
-  inc dx				; DX is paragraphcs to reserve
+  inc dx			; DX is paragraphcs to reserve
   mov ax, 3100h
   int 21h
 
-end top
+end main
+
 

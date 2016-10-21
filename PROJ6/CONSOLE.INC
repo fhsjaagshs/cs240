@@ -38,7 +38,6 @@ advrow:
   jge advrow		; then repeat advrow.
 afterwrap:
   call MoveCursorTo
-done:
   pop dx
   pop bx
   pop ax
@@ -153,7 +152,7 @@ CursorPosition PROC
 
   call ScreenProps	; Get the page number in BH
   mov ax, 0300h		; Setup BIOS interrupt code & clear extra
-			; side effects from call ScreenProps
+			; side effects from calling ScreenProps
   int 10h
 
   pop di
@@ -164,4 +163,9 @@ CursorPosition PROC
   pop ax
   ret
 CursorPosition ENDP
+
+
+
+
+
 

@@ -146,12 +146,12 @@ GetTimeBIOS PROC
   ;        CL minutes (BCD)
   ;        DH seconds (BCD)
   ;        DL daylight savings (00h std time, 01h daylight time)
-top:
+gtblbl:
   push ax
   mov ax, 0200h
   int 1Ah
   pop ax
-  jc top	; 1Ah/02h sets CF when it can't read the systime.
+  jc gtblbl		; 1Ah/02h sets CF when it can't read the systime.
 			; 99.999999% of the time, this is when the interrupt
 			; is called when the value is changing. Try again.
   ret
