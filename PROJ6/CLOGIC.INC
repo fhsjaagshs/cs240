@@ -9,7 +9,7 @@ show_clock BYTE 1
 
 readzero PROC
   ; IN si -> Byte index relative to 0 you want to read
-  ; OUT dl -> byte at 0:si
+  ; OUT dl -> byte at 0:[si]
   push es
 
   ; Sets ES to 0
@@ -45,40 +45,65 @@ aftertoggle:
   ret
 onkeypress ENDP
 
-ontimer PROC
-  cmp cs:[show_clock], 0
-  je noclock
-  call PrintClockURHCorner
-  jmp done
-noclock:
-  ; TODO: blot out bytes
-done:
-  ret
-ontimer ENDP
+clockstr   BYTE "00:00:00"
+noclockstr BYTE "        "
 
-PrintClockURHCorner PROC
+ontimer PROC
   push ax
   push bx
   push dx
 
-  call CursorPosition
-  push dx
+  call CursorPosition		; Get the cursor position
+  push dx			; and pop it. We'll move back
+				; after printing the clock.
 
-  call ScreenProps	; AH -> screen width
+  call ScreenProps		; AH -> screen width
   sub ah, 8			; 8 chars from end
-  mov dl, ah
+  mov dl, ah			; Move AH into column param for MoveCursorTo
   mov dh, 0
   call MoveCursorTo
-  call PrintClockConsole
 
-  pop dx
-  call MoveCursorTo
+;; ; This was an idea to print without moving the
+;  ; cursor, allowing for more efficient printing.
+;  ; it would have used a procedure not too far
+;  ; removed from the graphics hardware to print chars.
+;  ; Something about WriteManyAt doesn't work (prints garbage).
+;  ;
+;  ; Because of the cursor independence WriteManyAt offers, it might
+;  ; also circumvent the scrolling bug where the clock gets treated
+;  ; as part of the text onscreen, allowing the clock to exist independently
+;  ; of something like emacs (it seems running the clock over emacs causes
+;  ; changes to the file emacs is editing)
+;  push ax
+;  push cs
+;  mov ax, offset cs:noclockstr
+;  push ax
+;  mov ax, 8
+;  push ax
+;  call WriteManyAt
+;  pop ax
+
+  ; Clear out clock
+  push cx
+  mov dl, ' '
+  mov cx, 8
+  call WriteNConsole
+  neg cl
+  call MoveCursor
+  pop cx
+
+  cmp cs:[show_clock], 0	; Do we print a clock?
+  je movecback			; Skip printing the clock if we don't show it.
+  call PrintClockConsole
+movecback:
+  pop dx			; Pop the old cursor pos
+  call MoveCursorTo		; and move back
 
   pop dx
   pop bx
   pop ax
   ret
-PrintClockURHCorner ENDP
+ontimer ENDP
 
 PrintClockConsole PROC
   push cx
@@ -160,8 +185,6 @@ GetTimeBIOS ENDP
 orig_handle08 DWORD 0
 orig_handle09 DWORD 0
 
-;; THESE ARE TREATED AS PART OF THE INSTALLER
-;; They should be part of the TSR
 handle08 PROC
   pushf
   call cs:[orig_handle08]

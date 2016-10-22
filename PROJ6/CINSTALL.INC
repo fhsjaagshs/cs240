@@ -25,8 +25,8 @@ install08 PROC
   mov al, 08h
   mov dx, OFFSET cs:handle08
   call installhandler
-  mov word ptr cs:[orig_handle08], bx
-  mov word ptr cs:[orig_handle08+2], es
+  mov word ptr cs:orig_handle08, bx
+  mov word ptr cs:orig_handle08+2, es
 
   pop dx
   pop bx
@@ -41,8 +41,7 @@ uninstall08 PROC
   push bx
   push dx
 
-  mov ax, word ptr cs:orig_handle08+2
-  push ax
+  push word ptr cs:orig_handle08+2
   pop es
   mov al, 08h
   mov dx, word ptr cs:orig_handle08
@@ -55,32 +54,6 @@ uninstall08 PROC
   ret
 uninstall08 ENDP
 
-;install09 PROC
-;  push ax
-;  push bx
-;  push dx
-;  push ds
-;  push es
-
-;  mov ax, 3509h
-;  int 21h
-;  mov word ptr cs:orig_handle09, bx
-;  mov word ptr cs:orig_handle09+2, es
-;
-;  push cs
-;  pop ds
-;  mov dx, offset cs:handle09
-;  mov ax, 2509h
-;  int 21h
-
- ; pop es
- ; pop ds
- ; pop dx
- ; pop bx
- ; pop ax
- ; ret
-;install09 ENDP
-
 install09 PROC
   push es
   push ax
@@ -92,8 +65,8 @@ install09 PROC
   mov al, 09h
   mov dx, OFFSET cs:handle09
   call installhandler
-  mov word ptr cs:[orig_handle09], bx
-  mov word ptr cs:[orig_handle09+2], es
+  mov word ptr cs:orig_handle09, bx
+  mov word ptr cs:orig_handle09+2, es
 
   pop dx
   pop bx
@@ -108,8 +81,7 @@ uninstall09 PROC
   push bx
   push dx
 
-  mov ax, word ptr cs:orig_handle09+2
-  push ax
+  push word ptr cs:orig_handle09+2
   pop es
   mov al, 09h
   mov dx, word ptr cs:orig_handle09
@@ -133,14 +105,16 @@ installhandler PROC
   push ax
   push ds
 
-  push es	; Push segment of new handler
+  push es		; Push segment of new handler
+			; This must happen before reading
+			; the old handler because ES is overwritten.
 
-  mov ah, 35h	; Read IVT
-  int 21h	; sets BX and ES.
+  mov ah, 35h		; Read IVT entry # AL
+  int 21h		; and set BX and ES.
 
-  pop ds		; Pop seg of new handler into where DOS expects it.
-  mov ah, 25h	; Set the entry in the IVT.
-  int 21h		; other arg is (DS:DX)
+  pop ds		; Pop segment of new handler into DS.
+  mov ah, 25h		; Set the entry in
+  int 21h		; the IVT to (DS:DX).
 
   pop ds
   pop ax

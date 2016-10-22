@@ -93,6 +93,19 @@ WriteConsole PROC
   ; OUT: Writes DL at the cursor's current
   ;      position. The cursor is then advanced
   ;      one position.
+  push cx
+  mov cx, 1		; Print the char once.
+  call WriteNConsole
+  pop cx
+  ret
+WriteConsole ENDP
+
+WriteNConsole PROC
+  ; IN: dl -> char to write
+  ;     cx -> number of times to print the char.
+  ; OUT: Writes DL at the cursor's current
+  ;      position. The cursor is then advanced
+  ;      one position.
 
   push ax
   push bx
@@ -106,7 +119,6 @@ WriteConsole PROC
   call ScreenProps	; Put the page number in BH.
   pop ax
   mov al, dl		; Put the char to print in AL.
-  mov cx, 1		; Print the char once.
   mov ah, 0Ah		; BIOS interrupt code to print without attrs.
   int 10h		; Call BIOS.
 
@@ -120,7 +132,50 @@ WriteConsole PROC
   pop bx
   pop ax
   ret
-WriteConsole ENDP
+WriteNConsole ENDP
+
+WriteManyAt PROC
+  ; stdcall calling conventions
+  ; IN: Parameters (in order)
+  ;     1. segment
+  ;     2. offset
+  ;     3. count
+  ; IN: dl -> column
+  ;     dh -> row
+  ; Prints chars without moving the cursor.
+  push bp
+  mov bp, sp
+
+  push ax
+  push bx
+  push cx
+  push bp
+  push si
+  push di
+  push es
+
+  call ScreenProps	; Load page number into BH
+
+  mov cx, ss:[bp+8]	; Move the count into CX
+  mov es, ss:[bp+4]	; Move the segment into ES
+  mov bp, ss:[bp+6]	; Move the offset into BP
+
+  mov bl, 0Fh		; White on black attributes
+  mov ax, 1300h		; use subservice 00h, don't update cursor
+  int 10h		; Print CX chars at ES:BP
+
+  pop es
+  pop di
+  pop si
+  pop bp
+  pop cx
+  pop bx
+  pop ax
+
+  mov sp, bp
+  pop bp
+  ret 6
+WriteManyAt ENDP
 
 ScreenProps PROC
   ; IN: nothing
