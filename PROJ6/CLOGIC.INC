@@ -25,23 +25,23 @@ readzero PROC
 readzero ENDP
 
 onkeypress PROC
+  push ax
   push dx
   push si
-  push ax
-  xor ax, ax
-  mov si, 0417h						; Read shift byte
+
+  mov si, 0417h				; Read shift byte.
   call readzero
-  add al, dl
-  mov si, 0418h						; Read extended shift byte
+  mov al, dl				; Store first shift byte in AL.
+  mov si, 0418h				; Read extended shift byte.
   call readzero
-  add al, dl
-  cmp al, 3							; 3 means both shifts are pressed
-  jne done
+  add al, dl				; Add ext-shift byte to shift byte.
+  cmp al, 3				; 3 means both shifts are pressed.
+  jne aftertoggle
   xor cs:[show_clock], 00000001b	; Toggle show_clock
-done:
-  pop ax
+aftertoggle:
   pop si
   pop dx
+  pop ax
   ret
 onkeypress ENDP
 
@@ -156,4 +156,23 @@ gtblbl:
 			; is called when the value is changing. Try again.
   ret
 GetTimeBIOS ENDP
+
+orig_handle08 DWORD 0
+orig_handle09 DWORD 0
+
+;; THESE ARE TREATED AS PART OF THE INSTALLER
+;; They should be part of the TSR
+handle08 PROC
+  pushf
+  call cs:[orig_handle08]
+  call ontimer
+  iret
+handle08 ENDP
+
+handle09 PROC
+  pushf
+  call cs:[orig_handle09]
+  call onkeypress
+  iret
+handle09 ENDP
 

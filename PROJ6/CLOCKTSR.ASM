@@ -7,7 +7,6 @@ TITLE	clocktsr.asm
 
 .8086
 .model tiny
-.stack 4096
 .code
   org 100h
 main:

@@ -32,6 +32,8 @@ backrow:
 advrow:
   cmp dh, 24		; Are we offscreen?
   jg forwardoff		; if yes, then we should exit.
+  ; TODO: I would have loved to be able to scroll the
+  ; screen up instead of jg forwardoff.
   inc dh		; Increment the row.
   sub dl, ah		; Set the column number given movement.
   cmp dl, ah		; IF DL > AH (# columns on screen)
