@@ -28,9 +28,19 @@ main PROC
   mov ds, ax	; make up for machine quirk
 
   call installinthandlers
+  mov bh, 0		; Assume current page is 0.
+  mov ax, 0000h		; BIOS int 16h function for reading a char at cursor.
 waiter:
-  call ReadConsole
-  cmp dh, 2Eh		; CTRL-C
+  push sp
+  push bp
+  push si
+  push di
+  int 16h
+  pop di
+  pop si
+  pop bp
+  pop sp
+  cmp ah, 2Eh		; Is the scancode of the key just read a CTRL-C?
   jne waiter
 
   call uninstallinthandlers
@@ -40,4 +50,6 @@ waiter:
 main ENDP
 
 END main
+
+
 
