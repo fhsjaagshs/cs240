@@ -135,17 +135,11 @@ WriteNConsole PROC
 WriteNConsole ENDP
 
 WriteManyAt PROC
-  ; stdcall calling conventions
-  ; IN: Parameters (in order)
-  ;     1. segment
-  ;     2. offset
-  ;     3. count
-  ; IN: dl -> column
+  ; IN: cx -> count
+  ;     ds:si -> offset
+  ;     dl -> column
   ;     dh -> row
   ; Prints chars without moving the cursor.
-  push bp
-  mov bp, sp
-
   push ax
   push bx
   push cx
@@ -154,16 +148,19 @@ WriteManyAt PROC
   push di
   push es
 
+  push ds
+  pop es
+
+  push ax
   call ScreenProps	; Load page number into BH
-
-  mov cx, ss:[bp+8]	; Move the count into CX
-  mov es, ss:[bp+4]	; Move the segment into ES
-  mov bp, ss:[bp+6]	; Move the offset into BP
-
+  pop ax
+  mov bp, si
+  ; TODO: use attrs under cursor
   mov bl, 0Fh		; White on black attributes
   mov ax, 1300h		; use subservice 00h, don't update cursor
   int 10h		; Print CX chars at ES:BP
 
+done:
   pop es
   pop di
   pop si
@@ -172,9 +169,7 @@ WriteManyAt PROC
   pop bx
   pop ax
 
-  mov sp, bp
-  pop bp
-  ret 6
+  ret
 WriteManyAt ENDP
 
 ScreenProps PROC
@@ -220,6 +215,7 @@ CursorPosition PROC
   pop ax
   ret
 CursorPosition ENDP
+
 
 
 

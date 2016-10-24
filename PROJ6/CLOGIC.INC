@@ -51,119 +51,93 @@ noclockstr BYTE "        "
 ontimer PROC
   push ax
   push bx
+  push cx
   push dx
+  push ds
+  push si
 
-  call CursorPosition		; Get the cursor position
-  push dx			; and pop it. We'll move back
-				; after printing the clock.
+  push cs			; Ensure that DS
+  pop ds			; is equivalent to CS.
+				; Necessary for WriteManyAt.
 
+  call UpdateClock
+
+  mov si, OFFSET cs:noclockstr	; Assume we're clearing the clock.
+
+  cmp cs:[show_clock], 0	; Are we printing a clock?
+  je ot_print			; If we're not printing a clock, print
+  mov si, OFFSET cs:clockstr	; Otherwise, load the clock str into SI
+ot_print:
   call ScreenProps		; AH -> screen width
   sub ah, 8			; 8 chars from end
-  mov dl, ah			; Move AH into column param for MoveCursorTo
+  mov dl, ah			; Move AH into column param for WriteManyAt
   mov dh, 0
-  call MoveCursorTo
 
-;; ; This was an idea to print without moving the
-;  ; cursor, allowing for more efficient printing.
-;  ; it would have used a procedure not too far
-;  ; removed from the graphics hardware to print chars.
-;  ; Something about WriteManyAt doesn't work (prints garbage).
-;  ;
-;  ; Because of the cursor independence WriteManyAt offers, it might
-;  ; also circumvent the scrolling bug where the clock gets treated
-;  ; as part of the text onscreen, allowing the clock to exist independently
-;  ; of something like emacs (it seems running the clock over emacs causes
-;  ; changes to the file emacs is editing)
-;  push ax
-;  push cs
-;  mov ax, offset cs:noclockstr
-;  push ax
-;  mov ax, 8
-;  push ax
-;  call WriteManyAt
-;  pop ax
-
-  ; Clear out clock
-  push cx
-  mov dl, ' '
   mov cx, 8
-  call WriteNConsole
-  neg cl
-  call MoveCursor
-  pop cx
+  call WriteManyAt
 
-  cmp cs:[show_clock], 0	; Do we print a clock?
-  je movecback			; Skip printing the clock if we don't show it.
-  call PrintClockConsole
-movecback:
-  pop dx			; Pop the old cursor pos
-  call MoveCursorTo		; and move back
-
+  pop si
+  pop ds
   pop dx
+  pop cx
   pop bx
   pop ax
   ret
 ontimer ENDP
 
-PrintClockConsole PROC
+BCDToASCII PROC
+  ; IN: al -> BCD value
+  ;     ds:si -> buffer containing at least 2 bytes
+  ;              that will contain the BCD value
+  ;              in an ASCII representation.
+
+  push ax
+  and al, 0Fh		; Clear high nybble
+  add al, '0'		; ASCII-ize, assume no hex digits from A-F.
+  mov ds:[si+1], al	; Move into memory
+  pop ax
+
+  push ax
+  push cx
+  and al, 0F0h		; Clear low nybble
+  mov cl, 4		; | Shift AL 4 bytes
+  shr al, cl		; | to the right (move high bits into low bits)
+  add al, '0'		; ASCII-ize, assume no hex digits from A-F.
+  mov ds:[si], al	; Move into memory
+  pop cx
+  pop ax
+
+  ret
+BCDToASCII ENDP
+
+UpdateClock PROC
+  ; IN/OUT -> nothing
+  ; updates cs:clockstr
+
+  push ax
   push cx
   push dx
+  push si
+  mov si, OFFSET cs:clockstr
   call GetTimeBIOS
 
-  xchg dx, cx
-  xchg dh, dl
-  call HexOut8Console		; Print hours.
-  call WriteColonConsole	; Print a colon.
-  xchg dh, dl
-  call HexOut8Console		; Print minutes.
-  call WriteColonConsole	; Print a colon.
-  xchg cx, dx
-  xchg dl, dh
-  call HexOut8Console		; Print seconds.
+  mov al, ch		; | print hours to clockstr
+  call BCDToASCII	; |
 
+  add si, 3		; move to minutes position
+  mov al, cl		; | print minutes to clockstr
+  call BCDToASCII	; |
+
+  add si, 3		; move to seconds position
+  mov al, dh		; | print seconds to clockstr
+  call BCDToASCII	; |
+
+  pop si
   pop dx
   pop cx
-  ret
-PrintClockConsole ENDP
-
-WriteColonConsole PROC
-  push dx
-  mov dl, ':'
-  call WriteConsole
-  pop dx
-  ret
-WriteColonConsole ENDP
-
-HexOut4Console PROC
-  ; IN: dl -> byte to print in hex.
-  ; Prints low nybble of DL at cursor in hex.
-  push ax
-  push dx
-  and dl, 0Fh		; Clear high butes
-  add dl, '0'		; Convert DL into an ASCII char
-  cmp dl, '9'		; Is DL numeric? Only test if DL <= ASCII 9
-					; because we already ensured that DL >= ASCII 0.
-  jle print
-  add dl, 7		; When DL isn't numeric, advance to ASCII uppercase.
-print:
-  call WriteConsole
-  pop dx
   pop ax
   ret
-HexOut4Console ENDP
-
-HexOut8Console PROC
-  ; IN: dl -> byte
-  ; Prints DL as hex at the current cursor position.
-  push cx
-  mov cl, 4
-  rol dl, cl
-  call HexOut4Console
-  rol dl, cl
-  call HexOut4Console
-  pop cx
-  ret
-HexOut8Console ENDP
+UpdateClock ENDP
 
 ;; TODO: take daylight savings into account
 GetTimeBIOS PROC
