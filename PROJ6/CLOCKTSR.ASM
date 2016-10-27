@@ -21,6 +21,8 @@ INCLUDE cinstall.inc
 start:
   call installinthandlers
 
+  mov cs:clock_attrs, 00001001b	; Purple clock
+
   mov dx, OFFSET install
   mov cl, 4
   shr dx, cl			; DX is bytes/16
@@ -29,5 +31,8 @@ start:
   int 21h
 
 end main
+
+
+
 
 

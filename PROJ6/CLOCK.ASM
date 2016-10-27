@@ -27,6 +27,8 @@ main PROC
   mov ax, @data	; setup data segment
   mov ds, ax	; make up for machine quirk
 
+  mov cs:clock_attrs, 00000011b		; Set the color of the clock to cyan.
+
   call installinthandlers
   mov bh, 0		; Assume current page is 0.
   mov ax, 0000h		; BIOS int 16h function for reading a char at cursor.

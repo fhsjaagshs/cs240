@@ -45,6 +45,7 @@ onkeypress ENDP
 
 clockstr   BYTE "00:00:00"
 noclockstr BYTE "        "
+clock_attrs  BYTE 0Fh		; White on black
 
 ontimer PROC
   push ax
@@ -63,7 +64,8 @@ ontimer PROC
 ot_print:
   mov ax, 1300h			; Write String to Screen; Subservice 00h
 				; (Print char string, don't update cursor)
-  mov bx, 000Fh			; White on black & ASSUME page #0.
+  mov bh, 0			; ASSUME page #0
+  mov bl, cs:clock_attrs	; Load clock attributes.
   mov cx, 8			; cs:*clockstr is always 8 bytes long.
   mov dx, 0048h			; Print in Upper RHS corner. ASSUME width=80
   push cs			; | Point ES to the code segment,
@@ -119,13 +121,28 @@ UpdateClock PROC
 			; when the BIOS is updating the internal time.
 			; In that case, don't update the time.
 
-  ; TODO: take daylight savings into account
-
   ; At this point:
   ; CH -> hour (BCD)
   ; CL -> minute (BCD)
   ; DH -> seconds (BCD)
   ; DL -> (00h std time, 01h daylight savings time)
+
+  push ax
+  mov al, ch		; Move CH into daa compatible register.
+  add al, dl		; add DST shift to AL (the hours).
+  daa			; No daa! (hah)
+  mov ch, al		; move hours back into CH.
+  pop ax
+
+  cmp ch, 24h
+  jl uc_after_rotate_hour
+  mov ch, 00h
+uc_after_rotate_hour:
+
+  ; At this point:
+  ; CH -> hour w/ DST (BCD)
+  ; CL -> minute (BCD)
+  ; DH -> seconds (BCD)
 
   mov si, OFFSET cs:clockstr
 
