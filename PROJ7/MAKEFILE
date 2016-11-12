@@ -1,0 +1,23 @@
+dostunes.exe: dostunes.asm
+   ml /Fl dostunes.asm
+
+clean:
+   del *.exe
+   del *.lst
+   del *.obj
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
