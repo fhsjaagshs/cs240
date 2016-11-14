@@ -6,7 +6,7 @@ TITLE	dostunes.asm
 ; Read a .tune file and play the music encoded in it.
 ;
 ; The file consists of the following:
-; 
+;
 ; +-----------+-------+-------+
 ; | title len | title | music |
 ; +-----------+-------+-------+
@@ -26,8 +26,8 @@ TITLE	dostunes.asm
 ; lyric_len BYTE: 0 means no new lyric
 ;
 ; TODO:
-; 5. Load music
-; 6. (pausing via space)
+; - (pausing via space)
+
 .8086
 .model tiny
 .stack 4096
@@ -38,13 +38,14 @@ main:
 
 ;; DOSTUNES CONSTANTS
 CLOCKSPEED DWORD 1193280
+
 ;; DOSTUNES STATE
 runtsr BYTE 0			; A var to be modified by hand to run the program as a TSR or not.
 file_handle WORD ?
 
 current_freq WORD 0		; The frequency of the currently playing note
 remaining_time WORD 0		; How much longer the current note is going to play (in ms)
-current_lyric WORD 0 DUP(256)	; Current lyric (ASCII)
+current_lyric WORD 256 DUP(0)	; Current lyric (ASCII)
 current_lyric_len BYTE 0	; Length of current lyric
 finished_playing BYTE 0		; Did the song finish playing?
 
@@ -52,8 +53,8 @@ finished_playing BYTE 0		; Did the song finish playing?
 ;; INCLUDES
 ;;
 INCLUDE files.inc
-INCLUDE args.inc
-INCLUDE speaker.inc
+INCLUDE argv.inc
+INCLUDE speakers.inc
 INCLUDE printing.inc
 
 read_note PROC
@@ -61,6 +62,7 @@ read_note PROC
   ;      sets carry flag on EOF
   ; updates global player state
 
+  push ax
   push bx
   push cx
   push dx
@@ -105,19 +107,34 @@ read_note PROC
 
 read_note_done:
   clc
-  ret 
+  jmp read_note_return
 read_note_eof:
   stc
+read_note_return:
+  pop dx
+  pop cx
+  pop bx
+  pop ax
   ret
 read_note ENDP
 
 ;; Every 55 ms
 ontimer PROC
+  push bx
+  push cx
+  push dx
   cmp remaining_time, 55
   jg timer_done	; FIXME: should this be jge?
 
+  push dx
+  mov dl, '*'
+  call print_console_char
+  mov dl, 0Ah
+  call print_console_char
+  pop dx
+
   call read_note			; Read the next note & update global player state.
-  jc finished_playing			; See read_note definition/documentation
+  jc timer_finished_playing		; See read_note definition/documentation
 
   mov bx, cs:[current_freq]		; Load the frequency of the current note into BX.
   call set_speaker_frequency 		; Set the speaker's frequency to BX.
@@ -125,24 +142,27 @@ ontimer PROC
   xor ch, ch				; Clear CH.
   mov cl, cs:[current_lyric_len]	; Load lyric len into CL.
   mov dx, OFFSET cs:current_lyric  	; Load offset of current lyric into DX.
-  push dx				; Prepare a stdcall to either print_urhc or print_console.
+ ; push dx				; Prepare a stdcall to either print_urhc or print_console.
 
-  cmp cs:[runstr], 0			; Are we a TSR?
+  cmp cs:[runtsr], 0			; Are we a TSR?
   je timer_notsr			; If we're not, skip to timer_notsr.
-  call print_urhc			; If we are, print in upper right hand corner
+ ; call print_urhc			; If we are, print in upper right hand corner
   jmp timer_done			; and skip to timer_done.
 timer_notsr:
-  call print_console
+;  call print_console
 timer_done:
   sub cs:[remaining_time], 55		; Decrement remaining_time by timer interval
   jmp ontimer_done			; and we're done for this tick.
-finished_playing:
+timer_finished_playing:
   call disable_speaker			; Turn off the speaker hardware.
   mov bx, cs:[file_handle]		; Load our file handle into BX.
   call FClose				; Close the file handle in BX.
   mov cs:[remaining_time], 0		; Set the remaining time to 0
   mov cs:[finished_playing], 1		; Indicate that we finished playing.
 ontimer_done:
+  pop dx
+  pop cx
+  pop bx
   ret
 ontimer ENDP
 
@@ -308,10 +328,26 @@ installhandler PROC
   ret
 installhandler ENDP
 
+strlen PROC
+  ; IN: CS:SI -> ASCIIZ string offset in mem
+  ; OUT: CX -> length
+  push si
+  xor cx, cx
+sl_top:
+  cmp byte ptr cs:[si], 0
+  je sl_done
+  inc cx
+  inc si
+  jmp sl_top
+sl_done:
+  pop si
+
+  ret
+strlen ENDP
+
 ;; ARGV
-argc WORD 0
-argv BYTE 0 DUP(64)
-argv_mem BYTE 0 DUP(128)
+argv WORD 64 DUP(0)
+argv_mem BYTE 128 DUP(0)
 
 waiter:
   cmp cs:[finished_playing], 0
@@ -332,11 +368,24 @@ installtsr:
 start:
   mov si, OFFSET cs:argv_mem
   mov bx, OFFSET cs:argv
-  call args
-  mov cs:[argc], cx
+  call getcmdtail
+  call nullify
 
-  cmp cs:[argc], 1
+  push cx
+  push dx
+  mov dl, cl
+  add dl, '0'
+  call print_console_char
+  pop dx
+  pop cx
+
+  cmp cx, 1
   jne exit
+
+  mov si, cs:argv
+  call strlen
+  push si
+  call print_console
 
   mov dx, cs:[argv]
   call FOpen
@@ -351,6 +400,11 @@ start:
   je installtsr
 
   call install09
-  jmp waiter  
+  jmp waiter
 END main
+
+
+
+
+
 

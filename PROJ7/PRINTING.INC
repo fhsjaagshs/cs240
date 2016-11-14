@@ -3,25 +3,9 @@
 ;;
 ;; Basic procedures to print chars
 
-strlen PROC
-  ; IN: CS:BP -> ASCIIZ string
-  ; OUT: CX -> length of string
-  push bp
-  xor cx, cx
-strlen_top:
-  cmp cs:[bp], 0
-  je strlen_done
-  inc cx
-  inc bp
-  jmp strlen_top
-strlen_done:
-  pop bp
-  ret
-strlen ENDP
-
 print_urhc PROC
   ; IN: stack parameter: offset of ASCII string to print in CS
-	CX: string length
+  ;	CX: string length
   push bp
   mov bp, sp
 
@@ -31,14 +15,14 @@ print_urhc PROC
   push bp
   push es
 
-  mov bp, ss:[bp+2] 
+  mov bp, ss:[bp+2]
 
   mov ax, 1300h
   mov bx, 000Fh	; Page 0, white-on-black
   mov dx, 0050h	; print in first line, right justify
   sub dl, cl	; Move the cursor over.
   push cs
-  pop es 
+  pop es
   int 10h
 
   pop es
@@ -46,7 +30,7 @@ print_urhc PROC
   pop dx
   pop bx
   pop ax
-  
+
   pop bp
   ret 2
 print_urhc ENDP
@@ -61,14 +45,18 @@ print_console PROC
   push dx
   push si
 
-  mov si, ss:[bp+2] 
+  mov si, ss:[bp+4]
 
-print_console_loop:
+pc_top:
+  cmp cx, 0
+  je pc_done
   mov dl, cs:[si]
   inc si
+  dec cx
   call print_console_char
-  loop print_console_loop
-  
+  jmp pc_top
+
+pc_done:
   pop si
   pop dx
   pop cx
