@@ -48,6 +48,7 @@ remaining_time WORD 0		; How much longer the current note is going to play (in m
 current_lyric WORD 256 DUP(0)	; Current lyric (ASCII)
 current_lyric_len BYTE 0	; Length of current lyric
 finished_playing BYTE 0		; Did the song finish playing?
+song_title BYTE 64 DUP(0)	; The name of the currently playing song.
 
 ;;
 ;; INCLUDES
@@ -67,10 +68,10 @@ read_note PROC
   push cx
   push dx
 
-  mov cx, 2
   mov bx, cs:[file_handle]
 
   ;; read the frequency
+  mov cx, 2
   mov dx, OFFSET cs:current_freq
   call FReadAdv
   cmp ax, 0				; Did we get an error?
@@ -79,6 +80,7 @@ read_note PROC
   jl read_note_eof			; if we didn't abort.
 
   ;; read the duration
+  mov cx, 2
   mov dx, OFFSET cs:remaining_time
   call FReadAdv
   cmp ax, 0
@@ -101,7 +103,7 @@ read_note PROC
   mov dx, OFFSET cs:current_lyric
   call FReadAdv
   cmp ax, 0
-  jne read_note_done 
+  jne read_note_done
   cmp cl, cs:[current_lyric_len]
   jl read_note_eof
 
@@ -126,13 +128,6 @@ ontimer PROC
   cmp remaining_time, 55
   jg timer_done	; FIXME: should this be jge?
 
-  push dx
-  mov dl, '*'
-  call print_console_char
-  mov dl, 0Ah
-  call print_console_char
-  pop dx
-
   call read_note			; Read the next note & update global player state.
   jc timer_finished_playing		; See read_note definition/documentation
 
@@ -142,14 +137,14 @@ ontimer PROC
   xor ch, ch				; Clear CH.
   mov cl, cs:[current_lyric_len]	; Load lyric len into CL.
   mov dx, OFFSET cs:current_lyric  	; Load offset of current lyric into DX.
- ; push dx				; Prepare a stdcall to either print_urhc or print_console.
+  push dx				; Prepare a stdcall to either print_urhc or print_console.
 
   cmp cs:[runtsr], 0			; Are we a TSR?
   je timer_notsr			; If we're not, skip to timer_notsr.
- ; call print_urhc			; If we are, print in upper right hand corner
+  call print_urhc			; If we are, print in upper right hand corner
   jmp timer_done			; and skip to timer_done.
 timer_notsr:
-;  call print_console
+  call print_console
 timer_done:
   sub cs:[remaining_time], 55		; Decrement remaining_time by timer interval
   jmp ontimer_done			; and we're done for this tick.
@@ -370,22 +365,8 @@ start:
   mov bx, OFFSET cs:argv
   call getcmdtail
   call nullify
-
-  push cx
-  push dx
-  mov dl, cl
-  add dl, '0'
-  call print_console_char
-  pop dx
-  pop cx
-
   cmp cx, 1
   jne exit
-
-  mov si, cs:argv
-  call strlen
-  push si
-  call print_console
 
   mov dx, cs:[argv]
   call FOpen
@@ -393,6 +374,19 @@ start:
   jne exit
 
   mov cs:[file_handle], bx
+
+  mov cx, 2
+  mov dx, OFFSET cs:song_title
+  call FReadAdv
+  cmp ax, 0				; Did we get an error?
+  jne exit				; if we did, abort.
+  cmp cx, 2				; Did we read enough chars?
+  jl exit				; if we didn't abort.
+
+  mov cx, word ptr cs:[song_title]
+  call FReadAdv
+  cmp ax, 0
+  jne exit
 
   call install08
 
