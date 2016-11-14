@@ -1,65 +1,50 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
-
 
 char *safe_alloc_getsN(int n) {
   char *str = calloc(n + 1, sizeof(char));
-  if (!fgets(str, n + 1 ,stdin)) {
-    printf("asdf - fuck");
+
+  if (!fgets(str, n + 1, stdin)) {
     free(str);
     return NULL;
   }
+
   int len = strlen(str);
   if (str[len-1] == '\n') str[len-1] = 0;
+  else {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+  }
   return str;
 }
 
-int prompt_for_number(uint16_t *out) {
-  char *str = safe_alloc_getsN(5); // 5 places max for 16-bit number
+int prompt_for_number(unsigned short *out) {
+  char *str = (char *)safe_alloc_getsN(5);
   if (!str) return 1;
   if (strlen(str) == 0) {
-    printf("trapping\n");
     free(str);
     return 1;
   }
   *out = atoi(str);
   free(str);
-  return 0; 
+  return 0;
 }
 
-// Contains B# (C)
-const uint16_t notes[] = {
-  440, // A4
-  466, // A4#
-  494, // B4
-  523, // B4#
-  262, // C4
-  277, // C4#
-  294, // D4
-  311, // D4#
-  330, // E4
-  349, // E4#
-  349, // F4
-  370, // F4#
-  392, // G4
-  415 // G4#
-};
+const unsigned short notes[] = {440,466,494,523,262,277,294,311,330,349,349,370,392,415};
 
-// converts things like C6# or E4b to a frequency
-int prompt_for_freq(uint16_t *out) {
+int prompt_for_freq(unsigned short *out) {
   char *str = safe_alloc_getsN(3);
   if (!str) return 1;
   int len = strlen(str);
 
   int idx = 0;
-  int shift = 0;  
+  int shift = 0;
 
   if (len < 2) {
     free(str);
     return 1;
-  } 
+  }
 
   if (strncmp(str, "res", 3) == 0) {
     *out = 0;
@@ -69,69 +54,74 @@ int prompt_for_freq(uint16_t *out) {
 
   if (len >= 2) {
     char note = str[0];
-    if (note >= 'A' && note <= 'Z') note = note - 'A' + 'a';
+    if (note >= 'A' && note <= 'Z') note -= 'A' - 'a';
     if (note < 'a' || note > 'g') {
       free(str);
       return 2;
     }
     idx = (note - 'a') * 2;
 
-    char octave = str[1]; 
-    if (!(octave >= '0' && octave <= '9')) {
+    char octave = str[1];
+    if (octave < '0' || octave > '9') {
       free(str);
       return 2;
     }
     shift = octave - '0';
-  } 
 
-  if (len == 3) {
-    char sign = str[2];
-    if (sign == '#') idx++;
-    else if (sign == 'b') idx--;
-    else {
-      free(str);
-      return 2;
+
+    if (len == 3) {
+      char sign = str[2];
+      if (sign == '#') idx++;
+      else if (sign == 'b') idx--;
+      else {
+        free(str);
+        return 2;
+      }
     }
-  }
 
-  *out = notes[idx];
-  if (shift > 4) {
-    *out = *out << (shift - 4);
-  } else if (shift < 4) {
-    *out = *out >> (shift - 4);
+    *out = notes[idx];
+    if (shift > 4) {
+      *out = *out << (shift - 4);
+    } else if (shift < 4) {
+      *out = *out >> (shift - 4);
+    }
   }
 
   free(str);
   return 0;
 }
 
-int main(int argc, char **argv) {
-  FILE *fp =  fopen(argv[1], "wb");
-  const char *title = argv[2];
-  uint16_t len = (uint16_t)strlen(title);
+int main(int argc, const char **argv) {
+  if (argc != 3) {
+     printf("Invalid arguments\n");
+    return 1;
+  }
+  char *file = (char *)argv[1];
+  FILE *fp = fopen(file, "wb");
+  char *title = (char *)argv[2];
+  unsigned short len = (unsigned short)strlen(title);
 
-  fwrite(&len, sizeof(uint16_t), 1, fp); // write the title len
-  fwrite(title, sizeof(char), len, fp); // write the title
+  fwrite((const void *)(&len), sizeof(unsigned short), 1, fp);
+  fwrite((const void *)title, sizeof(char), len, fp);
 
   while (1) {
-    int16_t freq = 0;
-    int16_t duration = 0;
+    unsigned short freq = 0;
+    unsigned short duration = 0;
     printf("note: ");
     if (prompt_for_freq(&freq) != 0) break;
     printf("duration: ");
     if (prompt_for_number(&duration) != 0) break;
     printf("lyric: ");
     char *lyric = safe_alloc_getsN(256);
-    char len = lyric ? (char)strlen(lyric) : 0;
-    fwrite(&freq, sizeof(uint16_t), 1, fp);
-    fwrite(&duration, sizeof(uint16_t), 1, fp);
-    fwrite(&len, sizeof(char), 1, fp);
-    fwrite(lyric, sizeof(char), strlen(lyric), fp);
-    free(lyric);
+    char len = 0;
+    if (lyric != 0) len = (char)strlen(lyric);
+    fwrite((void *)(&freq), sizeof(unsigned short), 1, fp);
+    fwrite((const void *)(&duration), sizeof(unsigned short), 1, fp);
+    fwrite((const void *)(&len), sizeof(char), 1, fp);
+    fwrite((const void *)lyric, sizeof(char), strlen(lyric), fp);
+    free((void *)lyric);
     printf("===============\n");
   }
-
   fclose(fp);
   return 0;
 }
-
