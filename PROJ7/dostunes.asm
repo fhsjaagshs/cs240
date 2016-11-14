@@ -21,12 +21,11 @@ TITLE	dostunes.asm
 ; | frequency | duration | lyric_len | lyric |
 ; +-----------+----------+-----------+-------+
 ;
-; frequency
-; duration
-; lyric_len: 0 means no new lyric, -1 means clear lyric
+; frequency WORD
+; duration WORD
+; lyric_len BYTE: 0 means no new lyric
 ;
 ; TODO:
-; 3. Console I/O (use existing code!)
 ; 5. Load music
 ; 6. (pausing via space)
 .8086
@@ -40,149 +39,125 @@ main:
 ;; DOSTUNES CONSTANTS
 CLOCKSPEED DWORD 1193280
 ;; DOSTUNES STATE
-runtsr BYTE 0		; A var to be modified by hand to run the program as a TSR or not.
+runtsr BYTE 0			; A var to be modified by hand to run the program as a TSR or not.
 file_handle WORD ?
-remaining_time WORD 0	; How much longer the current note is going to play (in ms)
-finished_playing BYTE 0	; Did the song finish playing?
-is_paused BYTE 0	; Is the player paused?
 
+current_freq WORD 0		; The frequency of the currently playing note
+remaining_time WORD 0		; How much longer the current note is going to play (in ms)
+current_lyric WORD 0 DUP(256)	; Current lyric (ASCII)
+current_lyric_len BYTE 0	; Length of current lyric
+finished_playing BYTE 0		; Did the song finish playing?
+
+;;
+;; INCLUDES
+;;
 INCLUDE files.inc
 INCLUDE args.inc
 INCLUDE speaker.inc
+INCLUDE printing.inc
 
-strlen PROC
-  ; IN: CS:BP -> ASCIIZ string
-  ; OUT: CX -> length of string
-  push bp
-  xor cx, cx
-strlen_top:
-  cmp cs:[bp], 0
-  je strlen_done
-  inc cx
-  inc bp
-  jmp strlen_top
-strlen_done:
-  pop bp
-  ret
-strlen ENDP
+read_note PROC
+  ; OUT: AX -> error code from reading file
+  ;      sets carry flag on EOF
+  ; updates global player state
 
-print_urhc PROC
-  ; IN: stack parameter: offset of ASCII string to print in CS
-  push bp
-  mov bp, sp
-
-  push ax
   push bx
   push cx
   push dx
-  push bp
-  push es
 
-  mov bp, ss:[bp+2] 
-  call strlen
+  mov cx, 2
+  mov bx, cs:[file_handle]
 
-  mov ax, 1300h
-  mov bx, 000Fh	; Page 0, white-on-black
-  mov dx, 0050h	; print in first line, right justify
-  sub dl, cl	; Move the cursor over.
-  push cs
-  pop es 
-  int 10h
+  ;; read the frequency
+  mov dx, OFFSET cs:current_freq
+  call FReadAdv
+  cmp ax, 0				; Did we get an error?
+  jne read_note_done			; if we did, abort.
+  cmp cx, 2				; Did we read enough chars?
+  jl read_note_eof			; if we didn't abort.
 
-  pop es
-  pop bp
-  pop dx
-  pop cx
-  pop bx
-  pop ax
-  
-  pop bp
-  ret 4
-print_urhc ENDP
+  ;; read the duration
+  mov dx, OFFSET cs:remaining_time
+  call FReadAdv
+  cmp ax, 0
+  jne read_note_done
+  cmp cx, 2
+  jl read_note_eof
 
-print_console PROC
-  ; IN: stack parameter: offset of ASCII string to print in CS
-  push bp
-  mov bp, sp
+  ;; read the lyric length
+  mov cx, 1
+  mov dx, OFFSET cs:current_lyric_len
+  call FReadAdv
+  cmp ax, 0
+  jne read_note_done
+  cmp cx, 1
+  jl read_note_eof
 
-  push ax
-  push bx
-  push cx
-  push si
+  ;; read the lyric itself
+  xor ch, ch
+  mov cl, cs:[current_lyric_len]
+  mov dx, OFFSET cs:current_lyric
+  call FReadAdv
+  cmp ax, 0
+  jne read_note_done 
+  cmp cl, cs:[current_lyric_len]
+  jl read_note_eof
 
-  mov si, ss:[bp+2] 
-  call strlen
-
-  mov ah, 0Eh		; Print TTY
-print_console_loop:
-  mov al, cs:[si]
-  int 10h
-  loop print_console_loop
-  
-  pop si
-  pop cx
-  pop bx
-  pop ax
-
-  pop bp
-  ret 4
-print_console ENDP
+read_note_done:
+  clc
+  ret 
+read_note_eof:
+  stc
+  ret
+read_note ENDP
 
 ;; Every 55 ms
 ontimer PROC
   cmp remaining_time, 55
   jg timer_done	; FIXME: should this be jge?
 
-  ;; TODO: read next note
+  call read_note			; Read the next note & update global player state.
+  jc finished_playing			; See read_note definition/documentation
 
-  ; if eof encountered,
-  ; jmp finished_playing
+  mov bx, cs:[current_freq]		; Load the frequency of the current note into BX.
+  call set_speaker_frequency 		; Set the speaker's frequency to BX.
 
-  ;; TODO: load lyric
- 
+  xor ch, ch				; Clear CH.
+  mov cl, cs:[current_lyric_len]	; Load lyric len into CL.
+  mov dx, OFFSET cs:current_lyric  	; Load offset of current lyric into DX.
+  push dx				; Prepare a stdcall to either print_urhc or print_console.
 
-  ;; FReadAdv 
-  ;; IN:
-  ;;   BX -> handle
-  ;;   CX -> # bytes to read
-  ;;   CS:DX -> buffer to read into
-  ;; OUT:
-  ;;   AX -> error
-  ;;   CX -> number of bytes read
-  ;;   * updates CS:DX * 
-
-  cmp cs:[runstr], 0
-  je timer_notsr
-  call print_urhc
-  jmp timer_done
+  cmp cs:[runstr], 0			; Are we a TSR?
+  je timer_notsr			; If we're not, skip to timer_notsr.
+  call print_urhc			; If we are, print in upper right hand corner
+  jmp timer_done			; and skip to timer_done.
 timer_notsr:
   call print_console
 timer_done:
-  sub cs:[remaining_time], 55
-  ret
+  sub cs:[remaining_time], 55		; Decrement remaining_time by timer interval
+  jmp ontimer_done			; and we're done for this tick.
 finished_playing:
-  call disable_speaker
-  call uninstall08	; Figure out how to remove the handler from here after without DOS
-  mov bx, cs:[file_handle]
-  call FClose
-  mov cs:[remaining_time], 0
-  mov cs:[finished_playing], 1
+  call disable_speaker			; Turn off the speaker hardware.
+  mov bx, cs:[file_handle]		; Load our file handle into BX.
+  call FClose				; Close the file handle in BX.
+  mov cs:[remaining_time], 0		; Set the remaining time to 0
+  mov cs:[finished_playing], 1		; Indicate that we finished playing.
+ontimer_done:
   ret
 ontimer ENDP
 
 onkb PROC
-
+  ; TODO: space button pause
   ret
 onkb ENDP
 
+
 ;
-;; Functions to handle the
-;; installation of the timer INT handler.
-;; Hasn't changed from the clock project.
+;; INT handlers
 ;
 
-orig_handle08 DWORD ?
-orig_handle09 DWORD ?
+orig_handle08 DWORD 0
+orig_handle09 DWORD 0
 
 handle08 PROC
   pushf
@@ -198,9 +173,19 @@ handle09 PROC
   iret
 handle09 ENDP
 
+
+;
+;; Functions to handle the
+;; installation of the timer INT handler.
+;; Hasn't changed from the clock project.
+;
+
 installer:
 
 install09 PROC
+  cmp word ptr cs:[orig_handle09], 0
+  jne install09_done
+
   push es
   push ax
   push bx
@@ -218,10 +203,14 @@ install09 PROC
   pop bx
   pop ax
   pop es
+install09_done:
   ret
 install09 ENDP
 
 uninstall09 PROC
+  cmp word ptr cs:[orig_handle09], 0
+  je uninstall09_done
+
   push es
   push ax
   push bx
@@ -232,15 +221,21 @@ uninstall09 PROC
   mov al, 09h
   mov dx, word ptr cs:orig_handle09
   call installhandler
+  mov word ptr cs:orig_handle09, 0
+  mov word ptr cs:orig_handle09 + 2, 0
 
   pop dx
   pop bx
   pop ax
   pop es
+uninstall09_done:
   ret
 uninstall09 ENDP
 
 install08 PROC
+  cmp word ptr cs:[orig_handle08], 0
+  jne install08_done
+
   push es
   push ax
   push bx
@@ -258,10 +253,14 @@ install08 PROC
   pop bx
   pop ax
   pop es
+install08_done:
   ret
 install08 ENDP
 
 uninstall08 PROC
+  cmp word ptr cs:[orig_handle08], 0
+  je uninstall08_done
+
   push es
   push ax
   push bx
@@ -272,11 +271,14 @@ uninstall08 PROC
   mov al, 08h
   mov dx, word ptr cs:orig_handle08
   call installhandler
+  mov word ptr cs:orig_handle08, 0
+  mov word ptr cs:orig_handle08 + 2, 0
 
   pop dx
   pop bx
   pop ax
   pop es
+uninstall08_done:
   ret
 uninstall08 ENDP
 
@@ -312,9 +314,11 @@ argv BYTE 0 DUP(64)
 argv_mem BYTE 0 DUP(128)
 
 waiter:
-  cmp cs:[], 0
+  cmp cs:[finished_playing], 0
   je waiter
 exit:
+  call uninstall08
+  call uninstall09
   mov ax, 4C00h
   int 21h
 installtsr:
@@ -347,7 +351,6 @@ start:
   je installtsr
 
   call install09
-  
-  ;; don't int 21h/AX=4C00h, we'll do that when the song is over.
+  jmp waiter  
 END main
 
