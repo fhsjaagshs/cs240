@@ -1,8 +1,8 @@
-dostunes.exe: dostunes.asm
+dostunes.com: files.inc argv.inc speakers.inc dostunes.asm
    ml /Fl dostunes.asm
 
 clean:
-   del *.exe
+   del *.com
    del *.lst
    del *.obj
 
