@@ -36,11 +36,7 @@ TITLE	dostunes.asm
 main:
   jmp start
 
-;; DOSTUNES CONSTANTS
-CLOCKSPEED DWORD 1193280
-
 ;; DOSTUNES STATE
-runtsr BYTE 0			; A var to be modified by hand to run the program as a TSR or not.
 file_handle WORD ?
 
 current_freq WORD 0		; The frequency of the currently playing note
@@ -125,28 +121,27 @@ ontimer PROC
   push bx
   push cx
   push dx
-  cmp remaining_time, 55
-  jg timer_done	; FIXME: should this be jge?
+
+  mov dx, cs:[remaining_time]
+  sub cs:[remaining_time], 55		; Decrement remaining_time by timer interval
+  cmp dx, 55
+  jg ontimer_done			; FIXME: should this be jge?
 
   call read_note			; Read the next note & update global player state.
   jc timer_finished_playing		; See read_note definition/documentation
 
-  mov bx, cs:[current_freq]		; Load the frequency of the current note into BX.
-  call set_speaker_frequency 		; Set the speaker's frequency to BX.
+  mov bx, cs:[current_freq]		; Load the freq of the current note into BX.
+
+
+  call set_speaker_frequency 		; Set the speaker's freq to BX.
 
   xor ch, ch				; Clear CH.
   mov cl, cs:[current_lyric_len]	; Load lyric len into CL.
   mov dx, OFFSET cs:current_lyric  	; Load offset of current lyric into DX.
-  push dx				; Prepare a stdcall to either print_urhc or print_console.
-
-  cmp cs:[runtsr], 0			; Are we a TSR?
-  je timer_notsr			; If we're not, skip to timer_notsr.
-  call print_urhc			; If we are, print in upper right hand corner
-  jmp timer_done			; and skip to timer_done.
-timer_notsr:
+  push dx				; Prepare a stdcall print_console.
   call print_console
-timer_done:
-  sub cs:[remaining_time], 55		; Decrement remaining_time by timer interval
+  mov dl, ' '
+  call print_console_char
   jmp ontimer_done			; and we're done for this tick.
 timer_finished_playing:
   call disable_speaker			; Turn off the speaker hardware.
@@ -166,6 +161,62 @@ onkb PROC
   ret
 onkb ENDP
 
+HexOutNybble PROC
+; takes:
+; dl -> least significant nybble as input
+; causes -> prints said nybble in hex
+  push ax
+  push dx
+  and dl, 0Fh	; Clear high bits
+  add dl, '0'	; Convert dl to ASCII char
+  cmp dl, '9'   ; is DL numeric? Only test if dl <= ASCII 9
+		; because we ensured dl >= ASCII 0 on the previous line
+  jle print
+  add dl, 7     ; dl isn't numeric, skip garbage between ASCII 9 and ASCII A
+print:
+  mov ax, 0200h
+  int 21h
+  pop dx
+  pop ax
+  ret
+HexOutNybble ENDP
+
+HexOutByte PROC
+  ; takes:
+  ; dl -> byte to print as hex
+  ; causes: prints dl as hex
+
+  push dx
+
+  mov dh, dl		; Copy DL to DH for below algorithm
+
+  ; the below algorithm:
+  ; we read the character into both DL
+  ; and DH so that it appears like so:
+  ; DX: <highnybble><lownybble><highnybble><lownybble>
+  ;
+  ; then we shift DX right by four:
+  ; DX: 0000<highnybble><lownybble><highnybble>
+  ;
+  ; then `call HexOutNybble` to print the high nybble
+  ;
+  ; shifting right by 4 again causes:
+  ; DX: 00000000<highnybble><lownybble>
+  ;
+  ; then `call HexOutNybble` to print the low nybble.
+  ;
+  ; Now we've printed the byte in order.
+
+  push cx
+  mov cl, 4		; (for the shr instruction)
+  shr dx, cl		; Shift dx right 4 bits to
+  call HexOutNybble	; print the high nybble.
+  shr dx, cl		; Shift dx right 4 more bits to
+  call HexOutNybble	; print the low nybble.
+  pop cx
+  pop dx
+  ret
+HexOutByte ENDP
 
 ;
 ;; INT handlers
@@ -323,44 +374,13 @@ installhandler PROC
   ret
 installhandler ENDP
 
-strlen PROC
-  ; IN: CS:SI -> ASCIIZ string offset in mem
-  ; OUT: CX -> length
-  push si
-  xor cx, cx
-sl_top:
-  cmp byte ptr cs:[si], 0
-  je sl_done
-  inc cx
-  inc si
-  jmp sl_top
-sl_done:
-  pop si
-
-  ret
-strlen ENDP
-
 ;; ARGV
 argv WORD 64 DUP(0)
 argv_mem BYTE 128 DUP(0)
 
-waiter:
-  cmp cs:[finished_playing], 0
-  je waiter
-exit:
-  call uninstall08
-  call uninstall09
-  mov ax, 4C00h
-  int 21h
-installtsr:
-  mov dx, OFFSET installer
-  mov cl, 4
-  shr dx, cl
-  inc dx
-  mov ax, 3100h
-  int 21h
-
 start:
+  call enable_speaker
+
   mov si, OFFSET cs:argv_mem
   mov bx, OFFSET cs:argv
   call getcmdtail
@@ -372,7 +392,6 @@ start:
   call FOpen
   cmp ax, 0
   jne exit
-
   mov cs:[file_handle], bx
 
   mov cx, 2
@@ -388,13 +407,17 @@ start:
   cmp ax, 0
   jne exit
 
+  call enable_speaker
   call install08
-
-  cmp cs:[runtsr], 1
-  je installtsr
-
   call install09
-  jmp waiter
+waiter:
+  cmp cs:[finished_playing], 0
+  je waiter
+exit:
+  call uninstall08
+  call uninstall09
+  mov ax, 4C00h
+  int 21h
 END main
 
 

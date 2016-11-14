@@ -3,6 +3,8 @@
 ;;
 ;; Basic Speaker operations
 
+clkspd DWORD 1193280
+
 enable_speaker PROC
   ; IN/OUT: nothing
   ; enables the hardware speaker
@@ -27,13 +29,14 @@ disable_speaker ENDP
 
 set_speaker_frequency PROC
   ; IN: BX -> frequency
-
+  cmp bx, 0
+  je ssf_done
   push ax
-  push bx
   push dx
- 
-  mov ax, word ptr cs:CLOCKSPEED
-  mov dx, word ptr cs:CLOCKSPEED + 2
+
+  ; this was reversed from the demo
+  mov ax, word ptr cs:clkspd
+  mov dx, word ptr cs:clkspd + 2
   div bx
 
   push ax
@@ -46,9 +49,8 @@ set_speaker_frequency PROC
   out 66, al
 
   pop dx
-  pop bx
   pop ax
-
+ssf_done:
   ret
 set_speaker_frequency ENDP
 
