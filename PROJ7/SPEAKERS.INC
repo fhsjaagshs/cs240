@@ -32,8 +32,8 @@ set_speaker_frequency PROC
   push bx
   push dx
  
-  mov ax, word ptr CLOCKSPEED
-  mov dx, word ptr CLOCKSPEED + 2
+  mov ax, word ptr cs:CLOCKSPEED
+  mov dx, word ptr cs:CLOCKSPEED + 2
   div bx
 
   push ax
